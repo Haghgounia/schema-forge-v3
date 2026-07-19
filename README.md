@@ -58,3 +58,25 @@ Status: `http://localhost:9090/api/system/status`
 Swagger: `http://localhost:9090/swagger-ui.html`
 
 Frontend installation is not required for backend development.
+
+## Oracle inspection
+
+Oracle integration is disabled by default, so the application can start without an Oracle instance.
+Enable it with the following environment variables:
+
+```text
+SCHEMAFORGE_ORACLE_ENABLED=true
+SCHEMAFORGE_ORACLE_URL=jdbc:oracle:thin:@//localhost:1521/FREEPDB1
+SCHEMAFORGE_ORACLE_USERNAME=system
+SCHEMAFORGE_ORACLE_PASSWORD=your-password
+SCHEMAFORGE_ORACLE_QUERY_TIMEOUT_SECONDS=60
+```
+
+Inspection endpoints:
+
+```text
+GET /api/database/inspection?databaseType=ORACLE&schemaName=BIM
+GET /api/database/inspection/summary?databaseType=ORACLE&schemaName=BIM
+```
+
+The Oracle user needs dictionary visibility for the requested schema. Access to `DBA_TABLESPACES` and `V$RESERVED_WORDS` is required only for the related validation/dictionary operations.

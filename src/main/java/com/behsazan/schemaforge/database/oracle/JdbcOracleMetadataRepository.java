@@ -4,6 +4,11 @@ import com.behsazan.schemaforge.database.domain.ColumnDataTypeUsage;
 import com.behsazan.schemaforge.database.domain.ColumnState;
 import com.behsazan.schemaforge.database.domain.ConstraintState;
 import com.behsazan.schemaforge.database.domain.IndexState;
+import com.behsazan.schemaforge.database.domain.RoutineState;
+import com.behsazan.schemaforge.database.domain.SequenceState;
+import com.behsazan.schemaforge.database.domain.SynonymState;
+import com.behsazan.schemaforge.database.domain.TriggerState;
+import com.behsazan.schemaforge.database.domain.ViewState;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
 import com.behsazan.schemaforge.generation.spi.DatabaseType;
 import java.sql.ResultSet;
@@ -15,12 +20,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@ConditionalOnBean(NamedParameterJdbcTemplate.class)
+@ConditionalOnProperty(prefix = "schemaforge.oracle", name = "enabled", havingValue = "true")
 public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
 
     private static final String SCHEMA_EXISTS_SQL = "SELECT COUNT(*) FROM ALL_USERS WHERE USERNAME = :schema";
@@ -65,6 +70,54 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
              WHERE i.TABLE_OWNER = :owner AND i.TABLE_NAME = :tableName
              ORDER BY i.INDEX_NAME, ic.COLUMN_POSITION
             """;
+    private static final String SEQUENCES_SQL = """
+            SELECT SEQUENCE_NAME, MIN_VALUE, MAX_VALUE, INCREMENT_BY, CYCLE_FLAG, CACHE_SIZE, LAST_NUMBER
+              FROM ALL_SEQUENCES
+             WHERE SEQUENCE_OWNER = :owner
+             ORDER BY SEQUENCE_NAME
+            """;
+    private static final String VIEWS_SQL = """
+            SELECT VIEW_NAME AS OBJECT_NAME, TEXT AS QUERY_TEXT
+              FROM ALL_VIEWS
+             WHERE OWNER = :owner
+             ORDER BY VIEW_NAME
+            """;
+    private static final String MATERIALIZED_VIEWS_SQL = """
+            SELECT MVIEW_NAME AS OBJECT_NAME, QUERY AS QUERY_TEXT
+              FROM ALL_MVIEWS
+             WHERE OWNER = :owner
+             ORDER BY MVIEW_NAME
+            """;
+    private static final String SYNONYMS_SQL = """
+            SELECT OWNER, SYNONYM_NAME, TABLE_OWNER, TABLE_NAME
+              FROM ALL_SYNONYMS
+             WHERE OWNER IN (:owner, 'PUBLIC')
+               AND TABLE_OWNER = :owner
+             ORDER BY OWNER, SYNONYM_NAME
+            """;
+    private static final String TRIGGERS_SQL = """
+            SELECT TRIGGER_NAME, TABLE_OWNER, TABLE_NAME, TRIGGERING_EVENT, TRIGGER_TYPE, TRIGGER_BODY
+              FROM ALL_TRIGGERS
+             WHERE OWNER = :owner
+               AND BASE_OBJECT_TYPE = 'TABLE'
+             ORDER BY TRIGGER_NAME
+            """;
+    private static final String ROUTINES_SQL = """
+            SELECT OBJECT_NAME, OBJECT_TYPE
+              FROM ALL_PROCEDURES
+             WHERE OWNER = :owner
+               AND OBJECT_TYPE IN ('PROCEDURE', 'FUNCTION')
+               AND PROCEDURE_NAME IS NULL
+             ORDER BY OBJECT_TYPE, OBJECT_NAME
+            """;
+    private static final String ROUTINE_SOURCE_SQL = """
+            SELECT TEXT
+              FROM ALL_SOURCE
+             WHERE OWNER = :owner
+               AND NAME = :name
+               AND TYPE = :type
+             ORDER BY LINE
+            """;
     private static final String RESERVED_WORDS_SQL = "SELECT DISTINCT UPPER(TRIM(KEYWORD)) AS KEYWORD FROM V$RESERVED_WORDS WHERE KEYWORD IS NOT NULL";
     private static final String COLUMN_USAGE_COUNTS_SQL = """
             SELECT c.COLUMN_NAME, COUNT(DISTINCT c.OWNER || '.' || c.TABLE_NAME) AS USAGE_COUNT
@@ -97,6 +150,12 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
             schema.addTable(mapper.mapTable(owner, tableName, findTableComment(owner, tableName),
                     findColumns(owner, tableName), findConstraints(owner, tableName), findIndexes(owner, tableName)));
         }
+        findSequences(owner).stream().map(state -> mapper.mapSequence(owner, state)).forEach(schema::addSequence);
+        findViews(owner).stream().map(state -> mapper.mapView(owner, state)).forEach(schema::addView);
+        findMaterializedViews(owner).stream().map(state -> mapper.mapView(owner, state)).forEach(schema::addView);
+        findSynonyms(owner).stream().map(state -> mapper.mapSynonym(owner, state)).forEach(schema::addSynonym);
+        findTriggers(owner).stream().map(mapper::mapTrigger).forEach(schema::addTrigger);
+        findStandaloneRoutines(owner).stream().map(state -> mapper.mapRoutine(owner, state)).forEach(schema::addRoutine);
         return schema.build();
     }
 
@@ -142,6 +201,60 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
                 rs.getString("COLUMN_NAME"), nullableInteger(rs, "COLUMN_POSITION"), rs.getString("DESCEND")));
     }
 
+
+    @Override
+    public List<SequenceState> findSequences(String owner) {
+        return jdbcTemplate.query(SEQUENCES_SQL, Map.of("owner", normalize(owner)), (rs, rowNum) -> new SequenceState(
+                rs.getString("SEQUENCE_NAME"), rs.getLong("MIN_VALUE"), rs.getLong("MAX_VALUE"),
+                rs.getLong("INCREMENT_BY"), "Y".equalsIgnoreCase(rs.getString("CYCLE_FLAG")),
+                rs.getInt("CACHE_SIZE"), rs.getLong("LAST_NUMBER")));
+    }
+
+    @Override
+    public List<ViewState> findViews(String owner) {
+        return findViews(owner, VIEWS_SQL, false);
+    }
+
+    @Override
+    public List<ViewState> findMaterializedViews(String owner) {
+        return findViews(owner, MATERIALIZED_VIEWS_SQL, true);
+    }
+
+    private List<ViewState> findViews(String owner, String sql, boolean materialized) {
+        return jdbcTemplate.query(sql, Map.of("owner", normalize(owner)), (rs, rowNum) -> new ViewState(
+                rs.getString("OBJECT_NAME"), defaultIfBlank(rs.getString("QUERY_TEXT"), "SELECT 1 FROM DUAL"), materialized));
+    }
+
+    @Override
+    public List<SynonymState> findSynonyms(String owner) {
+        return jdbcTemplate.query(SYNONYMS_SQL, Map.of("owner", normalize(owner)), (rs, rowNum) -> new SynonymState(
+                rs.getString("SYNONYM_NAME"), rs.getString("TABLE_OWNER"), rs.getString("TABLE_NAME"),
+                "PUBLIC".equalsIgnoreCase(rs.getString("OWNER"))));
+    }
+
+    @Override
+    public List<TriggerState> findTriggers(String owner) {
+        return jdbcTemplate.query(TRIGGERS_SQL, Map.of("owner", normalize(owner)), (rs, rowNum) -> new TriggerState(
+                rs.getString("TRIGGER_NAME"), rs.getString("TABLE_OWNER"), rs.getString("TABLE_NAME"),
+                rs.getString("TRIGGER_TYPE"), rs.getString("TRIGGERING_EVENT"),
+                defaultIfBlank(rs.getString("TRIGGER_BODY"), "BEGIN NULL; END;")));
+    }
+
+    @Override
+    public List<RoutineState> findStandaloneRoutines(String owner) {
+        String normalizedOwner = normalize(owner);
+        return jdbcTemplate.query(ROUTINES_SQL, Map.of("owner", normalizedOwner), (rs, rowNum) -> {
+            String name = rs.getString("OBJECT_NAME");
+            String type = rs.getString("OBJECT_TYPE");
+            List<String> lines = jdbcTemplate.query(
+                    ROUTINE_SOURCE_SQL,
+                    Map.of("owner", normalizedOwner, "name", name, "type", type),
+                    (sourceRs, sourceRow) -> sourceRs.getString("TEXT"));
+            String body = lines.stream().filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.joining());
+            return new RoutineState(name, type, defaultIfBlank(body, "BEGIN NULL; END;"));
+        });
+    }
+
     @Override
     public Set<String> loadReservedWords() {
         return jdbcTemplate.query(RESERVED_WORDS_SQL, Map.of(), rs -> {
@@ -184,5 +297,6 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
     private Map<String, String> parameters(String owner, String tableName) { return Map.of("owner", normalize(owner), "tableName", normalize(tableName)); }
     private Integer nullableInteger(ResultSet rs, String column) throws SQLException { int value = rs.getInt(column); return rs.wasNull() ? null : value; }
     private String trimToNull(String value) { if (value == null) return null; String trimmed = value.trim(); return trimmed.isEmpty() ? null : trimmed; }
+    private String defaultIfBlank(String value, String fallback) { String trimmed = trimToNull(value); return trimmed == null ? fallback : trimmed; }
     private String normalize(String value) { if (value == null || value.isBlank()) throw new IllegalArgumentException("Oracle object name must not be blank"); return value.trim().toUpperCase(Locale.ROOT); }
 }

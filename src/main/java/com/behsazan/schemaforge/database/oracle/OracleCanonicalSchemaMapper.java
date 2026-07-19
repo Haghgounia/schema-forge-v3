@@ -26,9 +26,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-final class OracleCanonicalSchemaMapper {
+public final class OracleCanonicalSchemaMapper {
 
-    Table mapTable(
+    public Table mapTable(
             String owner,
             String tableName,
             String tableComment,
@@ -162,6 +162,61 @@ final class OracleCanonicalSchemaMapper {
                         Description.empty()));
             }
         }
+    }
+
+    public com.behsazan.schemaforge.domain.model.Sequence mapSequence(String owner, com.behsazan.schemaforge.database.domain.SequenceState state) {
+        return new com.behsazan.schemaforge.domain.model.Sequence(
+                QualifiedName.of(owner, state.name()),
+                state.lastNumber(),
+                state.incrementBy(),
+                state.minValue(),
+                state.maxValue(),
+                state.cycle(),
+                state.cacheSize(),
+                Description.empty());
+    }
+
+    public com.behsazan.schemaforge.domain.model.View mapView(String owner, com.behsazan.schemaforge.database.domain.ViewState state) {
+        return new com.behsazan.schemaforge.domain.model.View(
+                QualifiedName.of(owner, state.name()),
+                state.query(),
+                Description.empty(),
+                state.materialized());
+    }
+
+    public com.behsazan.schemaforge.domain.model.Synonym mapSynonym(String owner, com.behsazan.schemaforge.database.domain.SynonymState state) {
+        String synonymOwner = state.publicSynonym() ? "PUBLIC" : owner;
+        return new com.behsazan.schemaforge.domain.model.Synonym(
+                QualifiedName.of(synonymOwner, state.name()),
+                QualifiedName.of(state.targetOwner(), state.targetName()),
+                state.publicSynonym(),
+                Description.empty());
+    }
+
+    public com.behsazan.schemaforge.domain.model.Trigger mapTrigger(com.behsazan.schemaforge.database.domain.TriggerState state) {
+        return new com.behsazan.schemaforge.domain.model.Trigger(
+                QualifiedName.of(state.tableOwner(), state.name()),
+                QualifiedName.of(state.tableOwner(), state.tableName()),
+                state.timing(),
+                state.event(),
+                state.body(),
+                Description.empty());
+    }
+
+    public com.behsazan.schemaforge.domain.model.Routine mapRoutine(String owner, com.behsazan.schemaforge.database.domain.RoutineState state) {
+        com.behsazan.schemaforge.domain.enums.RoutineType type = "FUNCTION".equalsIgnoreCase(state.type())
+                ? com.behsazan.schemaforge.domain.enums.RoutineType.FUNCTION
+                : com.behsazan.schemaforge.domain.enums.RoutineType.PROCEDURE;
+        DataType returnType = type == com.behsazan.schemaforge.domain.enums.RoutineType.FUNCTION
+                ? DataType.simple("UNKNOWN")
+                : null;
+        return new com.behsazan.schemaforge.domain.model.Routine(
+                QualifiedName.of(owner, state.name()),
+                type,
+                List.of(),
+                returnType,
+                state.body(),
+                Description.empty());
     }
 
     private Identifier identifierOrNull(String value) {

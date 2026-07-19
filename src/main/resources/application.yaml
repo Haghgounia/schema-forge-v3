@@ -28,6 +28,13 @@ schemaforge:
     cleanup-on-startup: false
   web:
     allowed-origin: ${SCHEMAFORGE_UI_ORIGIN:http://localhost:5173}
+
+  oracle:
+    enabled: ${SCHEMAFORGE_ORACLE_ENABLED:false}
+    url: ${SCHEMAFORGE_ORACLE_URL:}
+    username: ${SCHEMAFORGE_ORACLE_USERNAME:}
+    password: ${SCHEMAFORGE_ORACLE_PASSWORD:}
+    query-timeout-seconds: ${SCHEMAFORGE_ORACLE_QUERY_TIMEOUT_SECONDS:60}
   oracle-schemas:
     BIM:
       data-tablespace: BIM_DATA
