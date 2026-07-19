@@ -2,7 +2,7 @@ package com.behsazan.schemaforge.generation.oracle;
 
 import com.behsazan.schemaforge.database.domain.ColumnDataTypeUsage;
 import com.behsazan.schemaforge.database.oracle.OracleDictionaryCache;
-import com.behsazan.schemaforge.database.oracle.OracleMetadataRepository;
+import com.behsazan.schemaforge.database.oracle.OracleMetadataProvider;
 import com.behsazan.schemaforge.specification.domain.ColumnDefinition;
 import com.behsazan.schemaforge.specification.domain.DataTypeDefinition;
 import com.behsazan.schemaforge.specification.domain.TableDefinition;
@@ -19,7 +19,7 @@ class OracleHintBuilderTest {
 
     @Test
     void generatesReservedWordUsageAndDataTypeConsistencyHints() {
-        OracleMetadataRepository repository = mock(OracleMetadataRepository.class);
+        OracleMetadataProvider repository = mock(OracleMetadataProvider.class);
         when(repository.loadReservedWords()).thenReturn(Set.of("COMMENT"));
         when(repository.loadColumnUsageCounts()).thenReturn(Map.of("COMMENT", 5, "CUSTOMER_ID", 74));
         when(repository.loadColumnDataTypeUsages()).thenReturn(Map.of(

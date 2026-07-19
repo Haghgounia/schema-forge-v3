@@ -15,12 +15,12 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "schemaforge.oracle", name = "enabled", havingValue = "true")
 public class OracleDictionaryCache {
 
-    private final OracleMetadataRepository repository;
+    private final OracleMetadataProvider repository;
     private Set<String> reservedWords = Set.of();
     private Map<String, Integer> columnUsageCounts = Map.of();
     private Map<String, List<ColumnDataTypeUsage>> columnDataTypeUsages = Map.of();
 
-    public OracleDictionaryCache(OracleMetadataRepository repository) {
+    public OracleDictionaryCache(OracleMetadataProvider repository) {
         this.repository = Objects.requireNonNull(repository, "repository must not be null");
     }
 

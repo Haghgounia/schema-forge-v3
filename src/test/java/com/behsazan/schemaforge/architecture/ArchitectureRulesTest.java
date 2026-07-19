@@ -25,4 +25,14 @@ class ArchitectureRulesTest {
                 .resideInAnyPackage("..generation.oracle..", "..generation.db2zos..", "..generation.postgresql..", "..generation.mysql..", "..generation.sqlserver..")
                 .check(classes);
     }
+
+    @Test
+    void databaseMetadataSpiMustNotDependOnConcreteProviders() {
+        var classes = new ClassFileImporter().importPackages("com.behsazan.schemaforge");
+        noClasses()
+                .that().resideInAPackage("..database.spi..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..database.oracle..", "..database.db2zos..", "..database.postgresql..", "..database.mysql..", "..database.sqlserver..")
+                .check(classes);
+    }
 }

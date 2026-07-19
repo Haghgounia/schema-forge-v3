@@ -14,7 +14,7 @@ class OracleDictionaryCacheTest {
 
     @Test
     void normalizesDictionaryLookups() {
-        OracleMetadataRepository repository = mock(OracleMetadataRepository.class);
+        OracleMetadataProvider repository = mock(OracleMetadataProvider.class);
         when(repository.loadReservedWords()).thenReturn(Set.of("SELECT"));
         when(repository.loadColumnUsageCounts()).thenReturn(Map.of("CUSTOMER_ID", 12));
         when(repository.loadColumnDataTypeUsages()).thenReturn(Map.of(

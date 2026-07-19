@@ -95,3 +95,12 @@
 - Migrated OracleDictionaryCache.
 - Added OracleHintBuilder with reserved-word, field-usage, and data-type consistency hints.
 - Added unit tests for cache normalization and hint generation.
+
+## Increment 03.9 - Database Metadata Provider SPI
+
+- Added the DBMS-neutral `DatabaseMetadataProvider` SPI.
+- Added the Oracle-specific `OracleMetadataProvider` adapter contract.
+- Renamed the JDBC implementation to `JdbcOracleMetadataProvider`.
+- Migrated application and Oracle cache consumers from repository contracts to provider contracts.
+- Retained deprecated repository interfaces as source-compatible migration bridges.
+- Added SPI and architecture regression tests.
