@@ -90,3 +90,8 @@
 - Added DBMS-independent SchemaCompareExcelWriter based on the canonical database model.
 - Added column usage counts and document/database difference detection.
 - Added regression test for workbook generation and difference markers.
+
+## Increment 03.8 - Oracle Hints
+- Migrated OracleDictionaryCache.
+- Added OracleHintBuilder with reserved-word, field-usage, and data-type consistency hints.
+- Added unit tests for cache normalization and hint generation.
