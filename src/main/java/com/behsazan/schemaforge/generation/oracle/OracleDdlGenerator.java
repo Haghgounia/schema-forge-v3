@@ -17,11 +17,14 @@ public final class OracleDdlGenerator implements DdlGenerator {
     private final OracleTableGenerator tableGenerator;
     private final OracleConstraintGenerator constraintGenerator;
     private final OracleIndexGenerator indexGenerator;
+    private final OracleViewGenerator viewGenerator;
+    private final OracleSynonymGenerator synonymGenerator;
     private final OracleSqlRenderer renderer;
 
     public OracleDdlGenerator() {
         this(new OracleSequenceGenerator(), new OracleTableGenerator(), new OracleConstraintGenerator(),
-                new OracleIndexGenerator(), new OracleSqlRenderer());
+                new OracleIndexGenerator(), new OracleViewGenerator(), new OracleSynonymGenerator(),
+                new OracleSqlRenderer());
     }
 
     public OracleDdlGenerator(
@@ -30,16 +33,32 @@ public final class OracleDdlGenerator implements DdlGenerator {
             OracleConstraintGenerator constraintGenerator,
             OracleIndexGenerator indexGenerator,
             OracleSqlRenderer renderer) {
+        this(sequenceGenerator, tableGenerator, constraintGenerator, indexGenerator,
+                new OracleViewGenerator(), new OracleSynonymGenerator(), renderer);
+    }
+
+    public OracleDdlGenerator(
+            OracleSequenceGenerator sequenceGenerator,
+            OracleTableGenerator tableGenerator,
+            OracleConstraintGenerator constraintGenerator,
+            OracleIndexGenerator indexGenerator,
+            OracleViewGenerator viewGenerator,
+            OracleSynonymGenerator synonymGenerator,
+            OracleSqlRenderer renderer) {
         this.sequenceGenerator = sequenceGenerator;
         this.tableGenerator = tableGenerator;
         this.constraintGenerator = constraintGenerator;
         this.indexGenerator = indexGenerator;
+        this.viewGenerator = viewGenerator;
+        this.synonymGenerator = synonymGenerator;
         this.renderer = renderer;
     }
 
     @Override
     public GenerationResult generate(GenerationContext context) {
         SqlDocument tableDocument = tableGenerator.generate(context.schema(), context.options().includeComments());
+        List<SqlSection> viewSections = viewGenerator.generate(
+                context.schema(), context.options().includeComments());
         List<SqlSection> sections = new ArrayList<>();
 
         addWhenNotEmpty(sections, sequenceGenerator.generate(context.schema()));
@@ -48,9 +67,16 @@ public final class OracleDdlGenerator implements DdlGenerator {
                 .forEach(sections::add);
         sections.addAll(constraintGenerator.generate(context.schema()));
         addWhenNotEmpty(sections, indexGenerator.generate(context.schema()));
+        viewSections.stream()
+                .filter(section -> section.order() < 200)
+                .forEach(section -> addWhenNotEmpty(sections, section));
+        addWhenNotEmpty(sections, synonymGenerator.generate(context.schema()));
         tableDocument.sections().stream()
                 .filter(section -> section.order() >= 200)
                 .forEach(sections::add);
+        viewSections.stream()
+                .filter(section -> section.order() >= 200)
+                .forEach(section -> addWhenNotEmpty(sections, section));
 
         String sql = renderer.render(new SqlDocument(sections));
         GeneratedArtifact artifact = GeneratedArtifact.text(

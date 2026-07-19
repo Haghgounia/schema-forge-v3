@@ -59,3 +59,12 @@
 - Disabled Oracle identity clause generation to retain the V2 sequence plus `DEFAULT ...NEXTVAL` convention.
 - Added regression coverage for Oracle constraint and index ordering.
 - No package refactoring or structural architecture changes.
+
+## Increment 03.3 - Oracle views and synonyms
+
+- Added Oracle generation for standard views.
+- Added Oracle generation for materialized views using the existing canonical `View.materialized` flag.
+- Added Oracle generation for private and public synonyms.
+- Added view and materialized-view comments when comment generation is enabled.
+- Added dependency ordering: tables, constraints, indexes, views, materialized views, synonyms, comments.
+- Added regression coverage for statement generation, query terminator normalization, and dependency ordering.

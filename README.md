@@ -80,3 +80,7 @@ GET /api/database/inspection/summary?databaseType=ORACLE&schemaName=BIM
 ```
 
 The Oracle user needs dictionary visibility for the requested schema. Access to `DBA_TABLESPACES` and `V$RESERVED_WORDS` is required only for the related validation/dictionary operations.
+
+### Oracle schema objects
+
+The Oracle generator currently supports sequences, tables, constraints, indexes, views, materialized views, private synonyms, public synonyms, and comments. Generated objects are emitted in dependency-safe order.
