@@ -1,0 +1,14 @@
+:root {
+  font-family: Tahoma, Arial, sans-serif;
+  color: #1f2937;
+  background: #f3f4f6;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+.sidebar { background: #111827; color: white; padding: 24px; }
+.sidebar nav { display: grid; gap: 8px; }
+.sidebar a { color: #d1d5db; text-decoration: none; padding: 10px 12px; border-radius: 6px; }
+.sidebar a.active, .sidebar a:hover { background: #374151; color: white; }
+.main-content { padding: 32px; }

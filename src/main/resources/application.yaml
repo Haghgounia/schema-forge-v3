@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: schema-forge-v3
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SCHEMAFORGE_SERVER_PORT:9090}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+schemaforge:
+  build:
+    version: "@project.version@"
+  generation:
+    default-database: ${SCHEMAFORGE_DEFAULT_DATABASE:ORACLE}
+    include-rollback: true
+    include-comments: true
+    include-dba-hints: true
+  workspace:
+    root: ${SCHEMAFORGE_WORKSPACE:./work}
+    cleanup-on-startup: false
+  web:
+    allowed-origin: ${SCHEMAFORGE_UI_ORIGIN:http://localhost:5173}
+  oracle-schemas:
+    BIM:
+      data-tablespace: BIM_DATA
+      index-tablespace: BIM_INDEX
+    DPS:
+      data-tablespace: DPS_DATA
+      index-tablespace: DPS_INDEX
+    LON:
+      data-tablespace: LON_DATA
+      index-tablespace: LON_INDEX
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    try-it-out-enabled: true

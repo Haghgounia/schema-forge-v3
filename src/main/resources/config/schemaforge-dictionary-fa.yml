@@ -1,0 +1,41 @@
+schemaforge:
+
+  dictionary:
+
+    headers:
+
+      COLUMN_NAME:
+        - "Column Name"
+        - "نام ستون"
+        - "نام فیلد"
+
+      DATA_TYPE:
+        - "Data Type"
+        - "نوع داده"
+
+      PRIMARY_KEY:
+        - "Primary/Foreign Key"
+        - "Primary Key"
+        - "کلید اصلی"
+        - "کلید خارجی"
+
+      UNIQUE:
+        - "Unique"
+        - "یکتا"
+
+      INDEX:
+        - "Index"
+        - "شاخص"
+
+      REQUIRED:
+        - "Required"
+        - "اجباری"
+
+      DEFAULT_VALUE:
+        - "Default"
+        - "مقدار پیش فرض"
+
+      DESCRIPTION:
+        - "Description"
+        - "شرح"
+        - "توضیحات"
