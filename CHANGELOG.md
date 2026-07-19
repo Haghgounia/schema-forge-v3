@@ -50,3 +50,12 @@
 - Restored missing SQL intermediate model classes.
 - Restored Oracle table generator, SQL renderer, and canonical type mapper.
 - No project structure changes.
+
+## 3.0.0-SNAPSHOT - Oracle DDL Increment 03.1
+
+- Added Oracle constraint generation for primary keys, unique keys, check constraints, and foreign keys.
+- Added Oracle standalone index generation.
+- Preserved dependency order: sequences, tables, local constraints, foreign keys, indexes, comments.
+- Disabled Oracle identity clause generation to retain the V2 sequence plus `DEFAULT ...NEXTVAL` convention.
+- Added regression coverage for Oracle constraint and index ordering.
+- No package refactoring or structural architecture changes.

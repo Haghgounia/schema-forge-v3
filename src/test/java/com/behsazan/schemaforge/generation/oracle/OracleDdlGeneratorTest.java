@@ -3,9 +3,18 @@ package com.behsazan.schemaforge.generation.oracle;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.behsazan.schemaforge.domain.model.Column;
+import com.behsazan.schemaforge.domain.enums.IndexType;
+import com.behsazan.schemaforge.domain.enums.ReferentialAction;
+import com.behsazan.schemaforge.domain.enums.SortDirection;
+import com.behsazan.schemaforge.domain.model.CheckConstraint;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
+import com.behsazan.schemaforge.domain.model.ForeignKey;
+import com.behsazan.schemaforge.domain.model.Index;
+import com.behsazan.schemaforge.domain.model.IndexColumn;
+import com.behsazan.schemaforge.domain.model.PrimaryKey;
 import com.behsazan.schemaforge.domain.model.Sequence;
 import com.behsazan.schemaforge.domain.model.Table;
+import com.behsazan.schemaforge.domain.model.UniqueKey;
 import com.behsazan.schemaforge.domain.valueobject.DataType;
 import com.behsazan.schemaforge.domain.valueobject.DefaultValue;
 import com.behsazan.schemaforge.domain.valueobject.Description;
@@ -62,4 +71,52 @@ class OracleDdlGeneratorTest {
 
         assertThat(sql.indexOf("CREATE SEQUENCE")).isLessThan(sql.indexOf("CREATE TABLE"));
     }
+    @Test
+    void generatesConstraintsAndIndexesInDependencyOrder() {
+        Table parent = Table.builder("LON", "PARENT")
+                .addColumn(new Column(Identifier.of("ID"), DataType.numeric("NUMBER", 10, null), false,
+                        null, null, false, 1))
+                .primaryKey(new PrimaryKey(Identifier.of("PK_PARENT"), java.util.List.of(Identifier.of("ID"))))
+                .build();
+
+        Table child = Table.builder("LON", "CHILD")
+                .addColumn(new Column(Identifier.of("ID"), DataType.numeric("NUMBER", 10, null), false,
+                        null, null, false, 1))
+                .addColumn(new Column(Identifier.of("PARENT_ID"), DataType.numeric("NUMBER", 10, null), false,
+                        null, null, false, 2))
+                .addColumn(new Column(Identifier.of("CODE"), DataType.varchar("STRING", 20), true,
+                        null, null, false, 3))
+                .primaryKey(new PrimaryKey(Identifier.of("PK_CHILD"), java.util.List.of(Identifier.of("ID"))))
+                .addUniqueKey(new UniqueKey(Identifier.of("UK_CHILD_CODE"), java.util.List.of(Identifier.of("CODE"))))
+                .addCheck(new CheckConstraint(Identifier.of("CK_CHILD_ID"), "ID > 0"))
+                .addForeignKey(new ForeignKey(Identifier.of("FK_CHILD_PARENT"),
+                        java.util.List.of(Identifier.of("PARENT_ID")), QualifiedName.of("LON", "PARENT"),
+                        java.util.List.of(Identifier.of("ID")), ReferentialAction.CASCADE, ReferentialAction.NO_ACTION))
+                .addIndex(new Index(Identifier.of("IX_CHILD_PARENT"),
+                        java.util.List.of(new IndexColumn(Identifier.of("PARENT_ID"), SortDirection.DESC)),
+                        IndexType.NORMAL, Description.empty()))
+                .build();
+
+        DatabaseSchema schema = DatabaseSchema.builder("LON").addTable(parent).addTable(child).build();
+        GenerationContext context = new GenerationContext(schema, DatabaseType.ORACLE,
+                new GenerationOptions(false, false, true, true, Map.of()), Clock.systemUTC());
+
+        String sql = new String(new OracleDdlGenerator().generate(context).artifacts().getFirst().content(),
+                StandardCharsets.UTF_8);
+
+        assertThat(sql)
+                .contains("ALTER TABLE LON.PARENT ADD CONSTRAINT PK_PARENT PRIMARY KEY (ID);")
+                .contains("ALTER TABLE LON.CHILD ADD CONSTRAINT UK_CHILD_CODE UNIQUE (CODE);")
+                .contains("ALTER TABLE LON.CHILD ADD CONSTRAINT CK_CHILD_ID CHECK (ID > 0);")
+                .contains("ALTER TABLE LON.CHILD ADD CONSTRAINT FK_CHILD_PARENT FOREIGN KEY (PARENT_ID) REFERENCES LON.PARENT (ID) ON DELETE CASCADE;")
+                .contains("CREATE INDEX LON.IX_CHILD_PARENT ON LON.CHILD (PARENT_ID DESC);");
+
+        assertThat(sql.indexOf("CREATE TABLE LON.CHILD"))
+                .isLessThan(sql.indexOf("CONSTRAINT PK_CHILD"));
+        assertThat(sql.indexOf("CONSTRAINT PK_CHILD"))
+                .isLessThan(sql.indexOf("CONSTRAINT FK_CHILD_PARENT"));
+        assertThat(sql.indexOf("CONSTRAINT FK_CHILD_PARENT"))
+                .isLessThan(sql.indexOf("CREATE INDEX LON.IX_CHILD_PARENT"));
+    }
+
 }
