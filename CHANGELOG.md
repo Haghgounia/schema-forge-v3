@@ -68,3 +68,19 @@
 - Added view and materialized-view comments when comment generation is enabled.
 - Added dependency ordering: tables, constraints, indexes, views, materialized views, synonyms, comments.
 - Added regression coverage for statement generation, query terminator normalization, and dependency ordering.
+
+## Increment 03.4 - DOCX specification parser migration
+
+- Migrated the table-design DOCX parser into the v3 canonical-model pipeline.
+- Added extraction of table metadata, columns, data types, required/default attributes, PK, FK, unique groups, index groups and checks.
+- Added legacy Oracle identity conversion to sequence plus `NEXTVAL` default.
+- Registered the DOCX parser as a Spring component.
+- Added a regression test using the CITIES table-design document.
+
+## Increment 03.5 - DOCX real-document regression corpus
+
+- Added regression coverage for six real table-design DOCX documents.
+- Covered CITIES, PROVINCES, PROVINCE_HISTORY, DEPOSITS, CONTRACTS and PROPOSEDS.
+- Added a parameterized parser corpus test that verifies schema, table and column extraction for every document.
+- Corrected the CITIES default-value assertion to unwrap the canonical column before accessing its value.
+- No package refactoring or architecture changes.
