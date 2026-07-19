@@ -84,3 +84,9 @@
 - Added a parameterized parser corpus test that verifies schema, table and column extraction for every document.
 - Corrected the CITIES default-value assertion to unwrap the canonical column before accessing its value.
 - No package refactoring or architecture changes.
+
+## Increment 3.7 - Schema comparison Excel migration
+
+- Added DBMS-independent SchemaCompareExcelWriter based on the canonical database model.
+- Added column usage counts and document/database difference detection.
+- Added regression test for workbook generation and difference markers.

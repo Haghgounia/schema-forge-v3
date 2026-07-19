@@ -354,12 +354,30 @@ public final class DocxSpecificationParser implements SpecificationParser {
         return cell == null ? null : emptyToNull(cell.getText());
     }
 
+
     private String normalizeIdentifier(String value) {
         String normalized = emptyToNull(value);
         if (normalized == null) {
             return null;
         }
-        return normalized.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
+
+        normalized = normalized
+                .replace('\u00A0', ' ')   // Non-breaking space
+                .replace('\u2007', ' ')   // Figure space
+                .replace('\u202F', ' ')   // Narrow no-break space
+                .replace("\uFEFF", "")    // BOM
+                .replace("\u200B", "")    // Zero width space
+                .replace("\u200C", "")    // Zero width non-joiner
+                .replace("\u200D", "")    // Zero width joiner
+                .replace('\t', ' ')
+                .replace('\r', ' ')
+                .replace('\n', ' ');
+
+        normalized = normalized
+                .trim()
+                .replaceAll("\\s+", "");
+
+        return normalized.toUpperCase(Locale.ROOT);
     }
 
     private String requireIdentifier(String value, String type, String fileName) {
@@ -384,8 +402,18 @@ public final class DocxSpecificationParser implements SpecificationParser {
         if (value == null) {
             return null;
         }
-        String normalized = normalizeText(value);
-        return normalized.isBlank() ? null : normalized;
+
+        value = value
+                .replace('\u00A0', ' ')
+                .replace('\u2007', ' ')
+                .replace('\u202F', ' ')
+                .replace("\uFEFF", "")
+                .replace("\u200B", "")
+                .replace("\u200C", "")
+                .replace("\u200D", "")
+                .trim();
+
+        return value.isEmpty() ? null : value;
     }
 
     private String normalizeText(String value) {
