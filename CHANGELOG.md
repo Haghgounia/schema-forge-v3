@@ -112,3 +112,16 @@
 - Added advisory data-type consistency warnings based on the most frequent existing canonical type.
 - Added structured discovery issues, categories, severities and result aggregation.
 - Added unit tests for field usage, type consistency and engine orchestration.
+
+## Recovery Patch 03 - DOCX header aliases
+
+- Added Persian and English aliases for metadata and column-table headers.
+- Added a regression test that builds and parses a DOCX with Persian headers.
+- No package refactoring or architecture changes.
+
+## 2026-07-20 - Phase 3 DOCX corpus scan
+
+- Added `DocxCorpusBatchTest` for recursive batch processing of large DOCX collections.
+- Added CSV reports for per-file results and unsupported data type expressions.
+- Added a summary report and SQL output for successfully processed documents.
+- Added support for `CHAR` and `BYTE` length semantics in DOCX data type expressions.

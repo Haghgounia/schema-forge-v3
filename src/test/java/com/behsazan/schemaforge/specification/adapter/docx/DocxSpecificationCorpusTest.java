@@ -22,7 +22,7 @@ class DocxSpecificationCorpusTest {
             "MCB.LON.TBL.PROPOSEDS.docx"
     })
     void parsesRealTableSpecifications(String fileName) throws Exception {
-        try (InputStream input = getClass().getResourceAsStream("/samples/" + fileName)) {
+        try (InputStream input = getClass().getResourceAsStream("/samples/docx/" + fileName)) {
             assertThat(input).as("sample %s", fileName).isNotNull();
 
             DatabaseSchema schema = parser.parse(new SpecificationSource(fileName, input));

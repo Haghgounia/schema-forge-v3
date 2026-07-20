@@ -20,6 +20,7 @@ import com.behsazan.schemaforge.domain.valueobject.Identifier;
 import com.behsazan.schemaforge.domain.valueobject.QualifiedName;
 import com.behsazan.schemaforge.specification.spi.SpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
+import com.behsazan.schemaforge.validation.oracle.OracleIdentifierValidator;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
@@ -41,8 +42,9 @@ import java.util.regex.Pattern;
 /** Parses the established SchemaForge table-design DOCX format into the canonical model. */
 @Component
 public final class DocxSpecificationParser implements SpecificationParser {
+    private final OracleIdentifierValidator identifierValidator = new OracleIdentifierValidator();
     private static final Pattern DATA_TYPE = Pattern.compile(
-            "(?i)([A-Z][A-Z0-9_ ]*)(?:\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\))?");
+            "(?i)^([A-Z][A-Z0-9_ ]*?)(?:\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?(?:\\s+(?:CHAR|BYTE))?\\s*\\))?$");
     private static final Pattern GROUP_REFERENCE = Pattern.compile("(?i)^([A-Z][A-Z0-9_$.]*)(?:/([YN]))?$" );
     private static final Pattern GROUP_POSITION = Pattern.compile("(?i)^([A-Z]+\\d+)(?:\\s*[,;:]\\s*(\\d+))?$" );
 
@@ -61,8 +63,8 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 throw new IllegalArgumentException("No column definitions were found in " + source.fileName());
             }
 
-            String schemaName = requireIdentifier(metadata.schema(), "schema", source.fileName());
-            String tableName = requireIdentifier(metadata.tableName(), "table", source.fileName());
+            String schemaName = identifierValidator.requireValid(metadata.schema(), "schema", source.fileName());
+            String tableName = identifierValidator.requireValid(metadata.tableName(), "table", source.fileName());
             Table table = buildTable(schemaName, tableName, metadata.description(), parsedColumns);
 
             DatabaseSchema.Builder schema = DatabaseSchema.builder(schemaName)
@@ -72,7 +74,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
             if (parsedColumns.stream().anyMatch(ParsedColumn::identity)) {
                 String sequenceName = "SEQ_" + tableName;
                 schema.addSequence(new Sequence(
-                        QualifiedName.of(schemaName, sequenceName),
+                        validatedQualifiedName(schemaName, sequenceName, "sequence"),
                         1,
                         1,
                         null,
@@ -95,7 +97,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
             ParsedColumn parsed = parsedColumns.get(index);
             String defaultExpression = parsed.identity() ? sequenceExpression : emptyToNull(parsed.defaultValue());
             table.addColumn(new Column(
-                    Identifier.of(parsed.name()),
+                    identifierValidator.toIdentifier(parsed.name(), "column"),
                     parsed.dataType(),
                     !parsed.required(),
                     new DefaultValue(defaultExpression),
@@ -110,7 +112,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 .toList();
         if (!primaryKeyColumns.isEmpty()) {
             table.primaryKey(new PrimaryKey(
-                    Identifier.of("PK_" + tableName),
+                    identifierValidator.toIdentifier("PK_" + tableName, "primary key"),
                     identifiers(primaryKeyColumns)));
         }
 
@@ -124,16 +126,16 @@ public final class DocxSpecificationParser implements SpecificationParser {
     private void addUniqueKeys(Table.Builder table, String tableName, List<ParsedColumn> columns) {
         Map<String, List<PositionedColumn>> groups = groupColumns(columns, ParsedColumn::uniqueToken);
         groups.forEach((group, members) -> table.addUniqueKey(new UniqueKey(
-                Identifier.of(normalizeObjectName("UK", tableName, group)),
+                identifierValidator.toIdentifier(normalizeObjectName("UK", tableName, group), "unique key"),
                 identifiers(sortedNames(members)))));
     }
 
     private void addIndexes(Table.Builder table, String tableName, List<ParsedColumn> columns) {
         Map<String, List<PositionedColumn>> groups = groupColumns(columns, ParsedColumn::indexToken);
         groups.forEach((group, members) -> table.addIndex(new Index(
-                Identifier.of(normalizeObjectName("IX", tableName, group)),
+                identifierValidator.toIdentifier(normalizeObjectName("IX", tableName, group), "index"),
                 sortedNames(members).stream()
-                        .map(name -> new IndexColumn(Identifier.of(name), SortDirection.ASC))
+                        .map(name -> new IndexColumn(identifierValidator.toIdentifier(name, "index column"), SortDirection.ASC))
                         .toList(),
                 IndexType.NORMAL,
                 Description.empty())));
@@ -146,10 +148,10 @@ public final class DocxSpecificationParser implements SpecificationParser {
             }
             Reference reference = parseReference(column.referenceTable());
             table.addForeignKey(new ForeignKey(
-                    Identifier.of("FK_" + tableName + "_" + column.name()),
-                    List.of(Identifier.of(column.name())),
-                    QualifiedName.of(reference.schema(), reference.table()),
-                    List.of(Identifier.of(column.name())),
+                    identifierValidator.toIdentifier("FK_" + tableName + "_" + column.name(), "foreign key"),
+                    List.of(identifierValidator.toIdentifier(column.name(), "foreign key column")),
+                    validatedQualifiedName(reference.schema(), reference.table(), "referenced table"),
+                    List.of(identifierValidator.toIdentifier(column.name(), "referenced column")),
                     ReferentialAction.NO_ACTION,
                     ReferentialAction.NO_ACTION));
         }
@@ -162,7 +164,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 continue;
             }
             table.addCheck(new CheckConstraint(
-                    Identifier.of("CK_" + tableName + "_" + column.name()),
+                    identifierValidator.toIdentifier("CK_" + tableName + "_" + column.name(), "check constraint"),
                     qualifyCheckExpression(column.name(), expression)));
         }
     }
@@ -258,10 +260,11 @@ public final class DocxSpecificationParser implements SpecificationParser {
         List<ParsedColumn> result = new ArrayList<>();
         for (int rowIndex = 1; rowIndex < table.getNumberOfRows(); rowIndex++) {
             XWPFTableRow row = table.getRow(rowIndex);
-            String name = normalizeIdentifier(cell(row, headers.get(Header.COLUMN_NAME)));
+            String name = identifierValidator.normalize(cell(row, headers.get(Header.COLUMN_NAME)));
             if (name == null) {
                 continue;
             }
+            identifierValidator.requireValid(name, "column");
             String rawType = cell(row, headers.get(Header.DATA_TYPE));
             if (rawType == null || rawType.isBlank()) {
                 continue;
@@ -289,14 +292,21 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 .toUpperCase(Locale.ROOT)
                 .replace("IDENTITY", "")
                 .replaceAll("\\s+", " ")
+                .replaceFirst("^TIMESTAMP\\s*\\(([^)]+)\\)\\s+WITH LOCAL TIME ZONE$",
+                        "TIMESTAMP WITH LOCAL TIME ZONE($1)")
+                .replaceFirst("^TIMESTAMP\\s*\\(([^)]+)\\)\\s+WITH TIME ZONE$",
+                        "TIMESTAMP WITH TIME ZONE($1)")
                 .trim();
         Matcher matcher = DATA_TYPE.matcher(normalized);
-        if (!matcher.find()) {
+        if (!matcher.matches()) {
             throw new IllegalArgumentException("Unsupported data type: " + rawValue);
         }
-        String name = matcher.group(1).trim().replace(" ", "");
+
+        String name = normalizeDataTypeName(matcher.group(1));
         Integer first = matcher.group(2) == null ? null : Integer.valueOf(matcher.group(2));
         Integer second = matcher.group(3) == null ? null : Integer.valueOf(matcher.group(3));
+        validateDataTypeParameters(name, first, second, rawValue);
+
         if (first == null) {
             return DataType.simple(name);
         }
@@ -304,6 +314,38 @@ public final class DocxSpecificationParser implements SpecificationParser {
             return DataType.varchar(name, first);
         }
         return DataType.numeric(name, first, second);
+    }
+
+    private String normalizeDataTypeName(String rawName) {
+        String name = rawName.trim().replaceAll("\\s+", " ");
+        return switch (name) {
+            case "INT" -> "INTEGER";
+            case "DECIMAL", "NUMERIC" -> "NUMBER";
+            case "TIMESTAMP WITH TIME ZONE" -> "TIMESTAMP_WITH_TIME_ZONE";
+            case "TIMESTAMP WITH LOCAL TIME ZONE" -> "TIMESTAMP_WITH_LOCAL_TIME_ZONE";
+            case "LONG RAW" -> "LONG_RAW";
+            default -> name.replace(" ", "");
+        };
+    }
+
+    private void validateDataTypeParameters(String name, Integer first, Integer second, String rawValue) {
+        boolean supported = switch (name) {
+            case "NUMBER", "INTEGER", "SMALLINT", "FLOAT", "BINARY_FLOAT", "BINARY_DOUBLE",
+                    "VARCHAR2", "VARCHAR", "NVARCHAR2", "CHAR", "NCHAR", "RAW",
+                    "DATE", "TIMESTAMP", "TIMESTAMP_WITH_TIME_ZONE",
+                    "TIMESTAMP_WITH_LOCAL_TIME_ZONE", "CLOB", "NCLOB", "BLOB",
+                    "LONG_RAW", "XMLTYPE", "JSON" -> true;
+            default -> false;
+        };
+        if (!supported) {
+            throw new IllegalArgumentException("Unsupported data type: " + rawValue);
+        }
+        if (second != null && !name.equals("NUMBER")) {
+            throw new IllegalArgumentException("Scale is only supported for NUMBER: " + rawValue);
+        }
+        if (first != null && !(isLengthType(name) || name.equals("NUMBER") || name.startsWith("TIMESTAMP"))) {
+            throw new IllegalArgumentException("Data type does not accept parameters: " + rawValue);
+        }
     }
 
     private boolean isLengthType(String name) {
@@ -355,42 +397,18 @@ public final class DocxSpecificationParser implements SpecificationParser {
     }
 
 
-    private String normalizeIdentifier(String value) {
-        String normalized = emptyToNull(value);
-        if (normalized == null) {
-            return null;
+    private QualifiedName validatedQualifiedName(String schemaName, String objectName, String objectType) {
+        String validatedObjectName = identifierValidator.requireValid(objectName, objectType);
+        if (schemaName == null || schemaName.isBlank()) {
+            return QualifiedName.of(null, validatedObjectName);
         }
-
-        normalized = normalized
-                .replace('\u00A0', ' ')   // Non-breaking space
-                .replace('\u2007', ' ')   // Figure space
-                .replace('\u202F', ' ')   // Narrow no-break space
-                .replace("\uFEFF", "")    // BOM
-                .replace("\u200B", "")    // Zero width space
-                .replace("\u200C", "")    // Zero width non-joiner
-                .replace("\u200D", "")    // Zero width joiner
-                .replace('\t', ' ')
-                .replace('\r', ' ')
-                .replace('\n', ' ');
-
-        normalized = normalized
-                .trim()
-                .replaceAll("\\s+", "");
-
-        return normalized.toUpperCase(Locale.ROOT);
-    }
-
-    private String requireIdentifier(String value, String type, String fileName) {
-        String normalized = normalizeIdentifier(value);
-        if (normalized == null) {
-            throw new IllegalArgumentException("Missing " + type + " name in " + fileName);
-        }
-        Identifier.of(normalized);
-        return normalized;
+        return QualifiedName.of(
+                identifierValidator.requireValid(schemaName, "schema"),
+                validatedObjectName);
     }
 
     private List<Identifier> identifiers(List<String> names) {
-        return names.stream().map(Identifier::of).toList();
+        return names.stream().map(name -> identifierValidator.toIdentifier(name, "column")).toList();
     }
 
     private String firstNonBlank(String first, String second) {
@@ -458,19 +476,24 @@ public final class DocxSpecificationParser implements SpecificationParser {
         private static Header from(String rawValue) {
             String value = rawValue == null ? "" : rawValue.replace('\n', ' ').replace('\r', ' ')
                                                    .trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
-            if (value.contains("TABLE NAME")) return TABLE_NAME;
-            if (value.equals("SCHEMA") || value.contains("SCHEMA ")) return SCHEMA;
-            if (value.contains("هدف از طراحی جدول") || value.contains("TABLE PURPOSE")) return TABLE_DESCRIPTION;
-            if (value.contains("COLUMN NAME")) return COLUMN_NAME;
-            if (value.contains("نام فارسی ستون") || value.contains("PERSIAN COLUMN")) return COLUMN_DESCRIPTION;
-            if (value.contains("DATA TYPE") || value.contains("نوع داده")) return DATA_TYPE;
+            if (value.contains("TABLE NAME") || value.contains("نام جدول")) return TABLE_NAME;
+            if (value.equals("SCHEMA") || value.contains("SCHEMA ")
+                    || value.contains("نام طرحواره") || value.equals("طرحواره")) return SCHEMA;
+            if (value.contains("هدف از طراحی جدول") || value.contains("شرح جدول")
+                    || value.contains("TABLE PURPOSE") || value.contains("TABLE DESCRIPTION")) return TABLE_DESCRIPTION;
+            if (value.contains("COLUMN NAME") || value.contains("نام ستون")) return COLUMN_NAME;
+            if (value.contains("نام فارسی ستون") || value.contains("شرح ستون")
+                    || value.contains("COLUMN DESCRIPTION") || value.contains("PERSIAN COLUMN")) return COLUMN_DESCRIPTION;
+            if (value.contains("DATA TYPE") || value.contains("DATATYPE") || value.contains("نوع داده")) return DATA_TYPE;
             if (value.contains("PRIMARY") || value.contains("FOREIGN") || value.contains("کلید")) return KEY;
             if (value.contains("UNIQUE") || value.contains("یکتا")) return UNIQUE;
-            if (value.equals("INDEX") || value.contains("شاخص")) return INDEX;
-            if (value.contains("REQUIRED") || value.contains("اجباری")) return REQUIRED;
-            if (value.contains("DEFAULT") || value.contains("پیش فرض")) return DEFAULT_VALUE;
-            if (value.equals("RANGE") || value.contains("محدوده")) return RANGE;
-            if (value.contains("CHECK") || value.contains("محدودیت کنترلی")) return CHECK_CONSTRAINT;
+            if (value.equals("INDEX") || value.contains("INDEX NAME")
+                    || value.contains("ایندکس") || value.contains("شاخص")) return INDEX;
+            if (value.contains("REQUIRED") || value.contains("MANDATORY") || value.contains("اجباری")) return REQUIRED;
+            if (value.contains("DEFAULT") || value.contains("مقدار پیش فرض") || value.contains("پیش فرض")) return DEFAULT_VALUE;
+            if (value.equals("RANGE") || value.contains("دامنه") || value.contains("محدوده")) return RANGE;
+            if (value.contains("CHECK") || value.contains("CHECK CONSTRAINT")
+                    || value.contains("محدودیت کنترلی")) return CHECK_CONSTRAINT;
             return UNKNOWN;
         }
     }

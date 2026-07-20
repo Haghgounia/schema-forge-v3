@@ -1,9 +1,10 @@
-# Samples
+# Sample files
 
-Place sanitized representative files here during migration:
+- `docx/`: input DOCX specifications used by the manual Oracle generation test.
+- `sql/`: generated Oracle SQL files.
 
-- `docx/`: Word schema specifications
-- `ea/`: Enterprise Architect XMI exports
-- `config/`: non-secret configuration examples
+Run only the sample generation test:
 
-Do not commit production credentials or confidential banking schemas.
+```bash
+mvn -Dtest=GenerateOracleScriptsFromSamplesTest test
+```
