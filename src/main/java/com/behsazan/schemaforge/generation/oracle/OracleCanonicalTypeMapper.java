@@ -17,6 +17,9 @@ public final class OracleCanonicalTypeMapper {
             case "INTEGER", "INT", "BIGINT", "SMALLINT", "DECIMAL", "NUMERIC", "NUMBER" -> number(type);
             case "BOOLEAN" -> "NUMBER(1)";
             case "DATETIME" -> "TIMESTAMP";
+            case "TIMESTAMP_WITH_TIME_ZONE" -> timestamp("TIMESTAMP WITH TIME ZONE", type);
+            case "TIMESTAMP_WITH_LOCAL_TIME_ZONE" -> timestamp("TIMESTAMP WITH LOCAL TIME ZONE", type);
+            case "LONG_RAW" -> "LONG RAW";
             default -> DIRECT.contains(name) ? withOptionalLength(name, type) : original(type);
         };
     }
@@ -32,7 +35,14 @@ public final class OracleCanonicalTypeMapper {
     }
 
     private String withOptionalLength(String name, DataType type) {
+        if (name.equals("TIMESTAMP") && type.precision() != null) {
+            return name + "(" + type.precision() + ")";
+        }
         return type.length() == null ? name : name + "(" + type.length() + ")";
+    }
+
+    private String timestamp(String name, DataType type) {
+        return type.precision() == null ? name : "TIMESTAMP(" + type.precision() + ")" + name.substring("TIMESTAMP".length());
     }
 
     private String original(DataType type) {
