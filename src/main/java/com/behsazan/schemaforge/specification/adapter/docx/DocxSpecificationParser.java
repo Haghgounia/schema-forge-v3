@@ -411,13 +411,32 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 .replace("\u200B", "")
                 .replace("\u200C", "")
                 .replace("\u200D", "")
+                .replace('\t', ' ')
+                .replace('\r', ' ')
+                .replace('\n', ' ')
                 .trim();
 
         return value.isEmpty() ? null : value;
     }
 
     private String normalizeText(String value) {
-        return value == null ? "" : value.replace('\n', ' ').replace('\r', ' ').trim().replaceAll("\\s+", " ");
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace('\u00A0', ' ')
+                .replace('\u2007', ' ')
+                .replace('\u202F', ' ')
+                .replace("\uFEFF", "")
+                .replace("\u200B", "")
+                .replace("\u200C", "")
+                .replace("\u200D", "")
+                .replace('\t', ' ')
+                .replace('\r', ' ')
+                .replace('\n', ' ')
+                .trim()
+                .replaceAll("\\s+", " ");
     }
 
     private enum Header {
@@ -438,7 +457,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
 
         private static Header from(String rawValue) {
             String value = rawValue == null ? "" : rawValue.replace('\n', ' ').replace('\r', ' ')
-                    .trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+                                                   .trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
             if (value.contains("TABLE NAME")) return TABLE_NAME;
             if (value.equals("SCHEMA") || value.contains("SCHEMA ")) return SCHEMA;
             if (value.contains("هدف از طراحی جدول") || value.contains("TABLE PURPOSE")) return TABLE_DESCRIPTION;

@@ -5,17 +5,14 @@ import com.behsazan.schemaforge.discovery.core.DiscoveryRule;
 import com.behsazan.schemaforge.discovery.domain.DiscoveryCategory;
 import com.behsazan.schemaforge.discovery.domain.DiscoveryIssue;
 import com.behsazan.schemaforge.discovery.domain.DiscoverySeverity;
-import com.behsazan.schemaforge.domain.model.Column;
 import com.behsazan.schemaforge.domain.valueobject.DataType;
 import com.behsazan.schemaforge.specification.domain.ColumnDefinition;
 import com.behsazan.schemaforge.specification.domain.DataTypeDefinition;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -26,9 +23,9 @@ public class DataTypeConsistencyRule implements DiscoveryRule {
     public List<DiscoveryIssue> evaluate(DiscoveryContext context) {
         List<DiscoveryIssue> issues = new ArrayList<>();
         for (ColumnDefinition documentColumn : context.documentTable().columns()) {
-            List<String> existingTypes = context.databaseSchema().tables().stream()
-                    .flatMap(table -> table.findColumn(documentColumn.name()).stream())
-                    .map(Column::dataType)
+            var usages = context.snapshot().findColumnUsage(documentColumn.name());
+            List<String> existingTypes = usages.stream()
+                    .map(usage -> usage.column().dataType())
                     .map(DataTypeConsistencyRule::signature)
                     .toList();
 
@@ -36,7 +33,7 @@ public class DataTypeConsistencyRule implements DiscoveryRule {
                 continue;
             }
 
-            String standardType = mostFrequent(existingTypes);
+            String standardType = ConsistencyRuleSupport.mostFrequent(existingTypes);
             String documentType = signature(documentColumn.dataType());
             if (standardType.equals(documentType)) {
                 continue;
@@ -46,6 +43,7 @@ public class DataTypeConsistencyRule implements DiscoveryRule {
             details.put("standardType", standardType);
             details.put("documentType", documentType);
             details.put("existingTypes", existingTypes.stream().distinct().sorted().collect(Collectors.joining(", ")));
+            details.put("locations", ConsistencyRuleSupport.locations(usages));
 
             issues.add(new DiscoveryIssue(
                     DiscoverySeverity.WARNING,
@@ -58,17 +56,6 @@ public class DataTypeConsistencyRule implements DiscoveryRule {
                     details));
         }
         return List.copyOf(issues);
-    }
-
-    private static String mostFrequent(List<String> values) {
-        return values.stream()
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
-                .entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder())
-                        .thenComparing(Map.Entry.comparingByKey()))
-                .map(Map.Entry::getKey)
-                .findFirst()
-                .orElseThrow();
     }
 
     private static String signature(DataTypeDefinition type) {

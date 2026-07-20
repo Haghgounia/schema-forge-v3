@@ -1,0 +1,21 @@
+SchemaForge recovery patch
+Base: schema-forge-v3-2026-07-20-1349.zip
+
+Preserved from healthy base:
+- DocxSpecificationParser.java
+- All six DOCX corpus files under src/test/resources/samples
+
+Merged from artifact-generation increment:
+- Artifact ZIP generation API/service/model
+- Schema Excel writer
+- Discovery snapshot model/builder
+- Length, nullable, and default consistency rules
+- Required DiscoveryEngine/DiscoveryContext rule updates
+- Associated tests
+
+No package relocation or architectural refactoring was performed.
+
+Build note:
+Maven could not be executed in the packaging environment because Maven is not installed and the wrapper download endpoint was unavailable. Run locally:
+  mvn clean test
+Expected test count after the merge: 40 tests (the original 34 plus 6 increment tests).
