@@ -104,3 +104,11 @@
 - Migrated application and Oracle cache consumers from repository contracts to provider contracts.
 - Retained deprecated repository interfaces as source-compatible migration bridges.
 - Added SPI and architecture regression tests.
+
+## Increment 03.10 - Priority-One Discovery Engine
+
+- Added the DBMS-neutral discovery engine and rule contract.
+- Added field-usage discovery for every document column.
+- Added advisory data-type consistency warnings based on the most frequent existing canonical type.
+- Added structured discovery issues, categories, severities and result aggregation.
+- Added unit tests for field usage, type consistency and engine orchestration.
