@@ -9,6 +9,8 @@ import com.behsazan.schemaforge.generation.ddl.model.DdlScript;
 import com.behsazan.schemaforge.generation.ddl.model.RenderContext;
 import com.behsazan.schemaforge.generation.ddl.renderer.RendererRegistry;
 import com.behsazan.schemaforge.generation.ddl.renderer.RenderedDdl;
+import com.behsazan.schemaforge.generation.enrichment.AuditColumnSchemaEnricher;
+import com.behsazan.schemaforge.generation.enrichment.SchemaEnricher;
 import com.behsazan.schemaforge.generation.plugin.DatabaseDdlPlugin;
 import com.behsazan.schemaforge.generation.plugin.DatabaseDdlPluginRegistry;
 import com.behsazan.schemaforge.generation.plugin.DefaultDatabaseDdlPlugin;
@@ -18,9 +20,15 @@ import java.util.Objects;
 /** Vendor-neutral orchestration layer for DDL generation. */
 public final class DdlGenerationEngine {
     private final DatabaseDdlPluginRegistry pluginRegistry;
+    private final SchemaEnricher schemaEnricher;
 
     public DdlGenerationEngine(DatabaseDdlPluginRegistry pluginRegistry) {
+        this(pluginRegistry, new AuditColumnSchemaEnricher());
+    }
+
+    public DdlGenerationEngine(DatabaseDdlPluginRegistry pluginRegistry, SchemaEnricher schemaEnricher) {
         this.pluginRegistry = Objects.requireNonNull(pluginRegistry, "pluginRegistry must not be null");
+        this.schemaEnricher = Objects.requireNonNull(schemaEnricher, "schemaEnricher must not be null");
     }
 
     /**
@@ -43,6 +51,7 @@ public final class DdlGenerationEngine {
                     columnGeneratorRegistry.require(product)));
         }
         this.pluginRegistry = new DatabaseDdlPluginRegistry(plugins);
+        this.schemaEnricher = new AuditColumnSchemaEnricher();
     }
 
     public DdlGenerationResult generate(DdlGenerationRequest request) {
@@ -50,7 +59,7 @@ public final class DdlGenerationEngine {
         DatabaseDdlPlugin plugin = pluginRegistry.require(request.databaseProduct());
         SchemaScriptGenerator scriptGenerator = new SchemaScriptGenerator(
                 new TableScriptGenerator(new TableDdlGenerator(plugin.columnDefinitionGenerator())));
-        DdlScript script = scriptGenerator.generate(request.schema(), plugin.dialect());
+        DdlScript script = scriptGenerator.generate(schemaEnricher.enrich(request.schema()), plugin.dialect());
         RenderedDdl rendered = plugin.renderer().render(
                 script,
                 new RenderContext(plugin.dialect(), request.options(), request.clock(), request.attributes()));

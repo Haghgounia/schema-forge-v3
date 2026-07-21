@@ -187,3 +187,10 @@
 - Removed Oracle/PostgreSQL branching from foreign-key, index, sequence, physical-options, and data-type core generators.
 - Deprecated the legacy multi-registry engine constructor and the individual dialect, renderer, and column-generator registries for removal in Phase 3.6.
 - Retained the `yyyyMMdd-HHmmss` Gregorian 24-hour timestamp naming convention for generated SQL, Excel, and ZIP artifacts.
+
+## Phase 3.5 - Audit columns and timestamped output names
+
+- Added a vendor-neutral schema enrichment step before DDL generation.
+- Added missing `CREATED_BY`, `CREATED_DATE`, `LAST_MODIFIED_BY`, and `LAST_MODIFIED_DATE` columns to the end of every table.
+- Existing audit columns are preserved and are not duplicated.
+- Standardized generated script names on Gregorian `yyyyMMdd-HHmmss` with 24-hour `HH`.

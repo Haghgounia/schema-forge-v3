@@ -4,6 +4,7 @@ import com.behsazan.schemaforge.database.service.DatabaseDictionaryCache;
 import com.behsazan.schemaforge.dialect.postgresql.PostgreSqlDialect;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
 import com.behsazan.schemaforge.generation.ddl.generator.script.TableScriptGenerator;
+import com.behsazan.schemaforge.generation.enrichment.AuditColumnSchemaEnricher;
 import com.behsazan.schemaforge.generation.ddl.generator.table.TableDdlGenerator;
 import com.behsazan.schemaforge.generation.ddl.generator.table.postgresql.PostgreSqlColumnDefinitionGenerator;
 import com.behsazan.schemaforge.generation.ddl.model.RenderContext;
@@ -21,6 +22,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -52,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnableConfigurationProperties(
         DocxDirectoryDdlGenerationTest.DdlGenerationProperties.class)
 class DocxDirectoryDdlGenerationTest {
+    private static final DateTimeFormatter OUTPUT_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final DdlGenerationProperties properties;
     private final DatabaseDictionaryCache databaseDictionaryCache;
@@ -94,6 +98,7 @@ class DocxDirectoryDdlGenerationTest {
         }
 
         DocxSpecificationParser parser = new DocxSpecificationParser();
+        AuditColumnSchemaEnricher auditColumnEnricher = new AuditColumnSchemaEnricher();
 
         OracleDdlGenerator oracleGenerator =
                 properties.dialects().oracle()
@@ -106,18 +111,19 @@ class DocxDirectoryDdlGenerationTest {
                         : null;
 
         List<FileResult> results = new ArrayList<>();
+        String outputTimestamp = LocalDateTime.now().format(OUTPUT_TIMESTAMP);
 
         for (Path docxFile : docxFiles) {
             Path relativeDocx = inputDirectory.relativize(docxFile);
 
             try (InputStream input = Files.newInputStream(docxFile)) {
-                DatabaseSchema schema = parser.parse(
+                DatabaseSchema schema = auditColumnEnricher.enrich(parser.parse(
                         new SpecificationSource(
                                 relativeDocx.toString(),
-                                input));
+                                input)));
 
                 Path relativeSql =
-                        replaceExtension(relativeDocx, ".sql");
+                        appendTimestamp(relativeDocx, outputTimestamp, ".sql");
 
                 if (properties.dialects().oracle()) {
                     String oracleSql = generateOracle(
@@ -672,4 +678,14 @@ class DocxDirectoryDdlGenerationTest {
             return "OK".equals(status);
         }
     }
+    private static Path appendTimestamp(Path source, String timestamp, String extension) {
+        Path fileName = source.getFileName();
+        String value = fileName.toString();
+        int dot = value.lastIndexOf('.');
+        String stem = dot > 0 ? value.substring(0, dot) : value;
+        String timestamped = stem + "-" + timestamp + extension;
+        Path parent = source.getParent();
+        return parent == null ? Path.of(timestamped) : parent.resolve(timestamped);
+    }
+
 }
