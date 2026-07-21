@@ -5,6 +5,9 @@ import com.behsazan.schemaforge.dialect.DialectRegistry;
 import com.behsazan.schemaforge.dialect.oracle.OracleDialect;
 import com.behsazan.schemaforge.dialect.postgresql.PostgreSqlDialect;
 import com.behsazan.schemaforge.generation.core.DdlGenerationEngine;
+import com.behsazan.schemaforge.generation.plugin.DatabaseDdlPlugin;
+import com.behsazan.schemaforge.generation.plugin.DatabaseDdlPluginRegistry;
+import com.behsazan.schemaforge.generation.plugin.DefaultDatabaseDdlPlugin;
 import com.behsazan.schemaforge.generation.ddl.generator.table.ColumnDefinitionGenerator;
 import com.behsazan.schemaforge.generation.ddl.generator.table.ColumnDefinitionGeneratorRegistry;
 import com.behsazan.schemaforge.generation.ddl.generator.table.oracle.OracleColumnDefinitionGenerator;
@@ -68,10 +71,28 @@ public class DdlEngineConfiguration {
     }
 
     @Bean
-    DdlGenerationEngine ddlGenerationEngine(
-            DialectRegistry dialectRegistry,
-            RendererRegistry rendererRegistry,
-            ColumnDefinitionGeneratorRegistry columnGeneratorRegistry) {
-        return new DdlGenerationEngine(dialectRegistry, rendererRegistry, columnGeneratorRegistry);
+    DatabaseDdlPlugin oracleDdlPlugin(
+            OracleDialect dialect,
+            OracleDdlRenderer renderer,
+            OracleColumnDefinitionGenerator columnGenerator) {
+        return new DefaultDatabaseDdlPlugin(dialect, renderer, columnGenerator);
+    }
+
+    @Bean
+    DatabaseDdlPlugin postgreSqlDdlPlugin(
+            PostgreSqlDialect dialect,
+            PostgreSqlDdlRenderer renderer,
+            PostgreSqlColumnDefinitionGenerator columnGenerator) {
+        return new DefaultDatabaseDdlPlugin(dialect, renderer, columnGenerator);
+    }
+
+    @Bean
+    DatabaseDdlPluginRegistry databaseDdlPluginRegistry(List<DatabaseDdlPlugin> plugins) {
+        return new DatabaseDdlPluginRegistry(plugins);
+    }
+
+    @Bean
+    DdlGenerationEngine ddlGenerationEngine(DatabaseDdlPluginRegistry pluginRegistry) {
+        return new DdlGenerationEngine(pluginRegistry);
     }
 }

@@ -18,6 +18,7 @@ public final class OracleDialect extends AbstractDatabaseDialect {
                 new OracleIdentifierRules(),
                 new OracleDataTypeRules(),
                 new OracleDdlSyntax(),
+                new OracleDdlGenerationPolicy(),
                 DatabaseCapabilities.of(
                         DatabaseCapability.SEQUENCE,
                         DatabaseCapability.IDENTITY,

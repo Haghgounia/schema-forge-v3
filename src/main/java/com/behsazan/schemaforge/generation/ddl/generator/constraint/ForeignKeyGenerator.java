@@ -1,7 +1,6 @@
 package com.behsazan.schemaforge.generation.ddl.generator.constraint;
 
 import com.behsazan.schemaforge.dialect.DatabaseDialect;
-import com.behsazan.schemaforge.dialect.DatabaseProduct;
 import com.behsazan.schemaforge.domain.enums.ReferentialAction;
 import com.behsazan.schemaforge.domain.model.ForeignKey;
 import com.behsazan.schemaforge.domain.model.Table;
@@ -57,30 +56,7 @@ public final class ForeignKeyGenerator {
     }
 
     private static void appendActions(StringBuilder ddl, ForeignKey foreignKey, DatabaseDialect dialect) {
-        if (dialect.product() == DatabaseProduct.ORACLE) {
-            appendOracleDeleteAction(ddl, foreignKey.onDelete());
-            if (foreignKey.onUpdate() != ReferentialAction.NO_ACTION) {
-                throw new IllegalArgumentException("Oracle does not support ON UPDATE actions for foreign keys");
-            }
-            return;
-        }
-        appendStandardAction(ddl, "ON DELETE", foreignKey.onDelete());
-        appendStandardAction(ddl, "ON UPDATE", foreignKey.onUpdate());
-    }
-
-    private static void appendOracleDeleteAction(StringBuilder ddl, ReferentialAction action) {
-        switch (action) {
-            case NO_ACTION -> { }
-            case CASCADE -> ddl.append("\nON DELETE CASCADE");
-            case SET_NULL -> ddl.append("\nON DELETE SET NULL");
-            case RESTRICT, SET_DEFAULT -> throw new IllegalArgumentException(
-                    "Oracle does not support ON DELETE " + action.name().replace('_', ' '));
-        }
-    }
-
-    private static void appendStandardAction(StringBuilder ddl, String clause, ReferentialAction action) {
-        if (action != ReferentialAction.NO_ACTION) {
-            ddl.append("\n").append(clause).append(" ").append(action.name().replace('_', ' '));
-        }
+        ddl.append(dialect.ddlGenerationPolicy().renderForeignKeyActions(
+                foreignKey.onDelete(), foreignKey.onUpdate()));
     }
 }

@@ -18,6 +18,7 @@ public final class StandardDialect extends AbstractDatabaseDialect {
                 new StandardIdentifierRules(),
                 new StandardDataTypeRules(),
                 new StandardDdlSyntax(),
+                new StandardDdlGenerationPolicy(),
                 DatabaseCapabilities.of(
                         DatabaseCapability.IDENTITY,
                         DatabaseCapability.CHECK_CONSTRAINT,

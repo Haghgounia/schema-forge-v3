@@ -1,7 +1,6 @@
 package com.behsazan.schemaforge.generation.ddl.generator.index;
 
 import com.behsazan.schemaforge.dialect.DatabaseDialect;
-import com.behsazan.schemaforge.dialect.DatabaseProduct;
 import com.behsazan.schemaforge.domain.enums.IndexType;
 import com.behsazan.schemaforge.domain.enums.SortDirection;
 import com.behsazan.schemaforge.domain.model.Index;
@@ -62,7 +61,8 @@ public final class IndexGenerator {
 
     private String qualifiedIndexName(Table table, Identifier name, DatabaseDialect dialect) {
         String renderedName = identifiers.render(name, dialect);
-        if (dialect.product() == DatabaseProduct.POSTGRESQL || table.qualifiedName().schema() == null) {
+        if (!dialect.ddlGenerationPolicy().qualifyIndexNameWithSchema()
+                || table.qualifiedName().schema() == null) {
             return renderedName;
         }
         return identifiers.render(table.qualifiedName().schema(), dialect) + "." + renderedName;
@@ -76,20 +76,6 @@ public final class IndexGenerator {
     }
 
     private static String typePrefix(IndexType type, DatabaseDialect dialect) {
-        if (dialect.product() == DatabaseProduct.ORACLE) {
-            return switch (type) {
-                case NORMAL -> "";
-                case UNIQUE -> "UNIQUE ";
-                case BITMAP -> "BITMAP ";
-                case FUNCTION_BASED, CLUSTERED, NONCLUSTERED -> throw new IllegalArgumentException(
-                        "Oracle index type is not supported by Index Engine v1: " + type);
-            };
-        }
-        return switch (type) {
-            case NORMAL -> "";
-            case UNIQUE -> "UNIQUE ";
-            case BITMAP, FUNCTION_BASED, CLUSTERED, NONCLUSTERED -> throw new IllegalArgumentException(
-                    "Index type is not supported by the selected dialect in Index Engine v1: " + type);
-        };
+        return dialect.ddlGenerationPolicy().indexTypePrefix(type);
     }
 }

@@ -5,6 +5,8 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
+/** @deprecated Use DatabaseDdlPluginRegistry. Scheduled for removal in Phase 3.6. */
+@Deprecated(forRemoval = true, since = "3.4")
 public final class DialectRegistry {
 
     private final Map<DatabaseProduct, DatabaseDialect> dialects;

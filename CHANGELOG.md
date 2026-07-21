@@ -178,3 +178,12 @@
 - Added Spring composition for Oracle and PostgreSQL dialects and renderers.
 - Migrated `ArtifactGenerationService` away from `generation.oracle.OracleDdlGenerator`.
 - Preserved Oracle as the current default output target while removing the application-layer Oracle generator dependency.
+
+## 2026-07-21 - Phase 3.4 Core Database Independence
+
+- Added `DatabaseDdlPlugin` and `DatabaseDdlPluginRegistry` as the single DDL plugin entry point.
+- Migrated `DdlGenerationEngine` to resolve one complete plugin instead of three independent registries.
+- Added database-owned `DdlGenerationPolicy` implementations for Oracle, PostgreSQL, and Standard SQL.
+- Removed Oracle/PostgreSQL branching from foreign-key, index, sequence, physical-options, and data-type core generators.
+- Deprecated the legacy multi-registry engine constructor and the individual dialect, renderer, and column-generator registries for removal in Phase 3.6.
+- Retained the `yyyyMMdd-HHmmss` Gregorian 24-hour timestamp naming convention for generated SQL, Excel, and ZIP artifacts.

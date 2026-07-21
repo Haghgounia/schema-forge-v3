@@ -6,6 +6,7 @@ public final class PostgreSqlDialect extends AbstractDatabaseDialect {
     public PostgreSqlDialect() { this(new PostgreSqlIdentifierPolicy(), new PostgreSqlReservedWordProvider()); }
     private PostgreSqlDialect(PostgreSqlIdentifierPolicy policy, PostgreSqlReservedWordProvider words) {
         super(new PostgreSqlIdentifierRules(), new PostgreSqlDataTypeRules(), new PostgreSqlDdlSyntax(),
+                new PostgreSqlDdlGenerationPolicy(),
                 DatabaseCapabilities.of(DatabaseCapability.SEQUENCE, DatabaseCapability.IDENTITY,
                         DatabaseCapability.CHECK_CONSTRAINT, DatabaseCapability.COMMENT_ON,
                         DatabaseCapability.GENERATED_COLUMN, DatabaseCapability.CASCADE_DELETE,

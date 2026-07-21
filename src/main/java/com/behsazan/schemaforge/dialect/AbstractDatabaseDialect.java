@@ -7,6 +7,7 @@ public abstract class AbstractDatabaseDialect implements DatabaseDialect {
     private final IdentifierRules identifierRules;
     private final DataTypeRules dataTypeRules;
     private final DdlSyntax ddlSyntax;
+    private final DdlGenerationPolicy ddlGenerationPolicy;
     private final DatabaseCapabilities capabilities;
     private final IdentifierPolicy identifierPolicy;
     private final ReservedWordProvider reservedWordProvider;
@@ -17,6 +18,7 @@ public abstract class AbstractDatabaseDialect implements DatabaseDialect {
             IdentifierRules identifierRules,
             DataTypeRules dataTypeRules,
             DdlSyntax ddlSyntax,
+            DdlGenerationPolicy ddlGenerationPolicy,
             DatabaseCapabilities capabilities,
             IdentifierPolicy identifierPolicy,
             ReservedWordProvider reservedWordProvider,
@@ -25,6 +27,7 @@ public abstract class AbstractDatabaseDialect implements DatabaseDialect {
         this.identifierRules = Objects.requireNonNull(identifierRules, "identifierRules must not be null");
         this.dataTypeRules = Objects.requireNonNull(dataTypeRules, "dataTypeRules must not be null");
         this.ddlSyntax = Objects.requireNonNull(ddlSyntax, "ddlSyntax must not be null");
+        this.ddlGenerationPolicy = Objects.requireNonNull(ddlGenerationPolicy, "ddlGenerationPolicy must not be null");
         this.capabilities = Objects.requireNonNull(capabilities, "capabilities must not be null");
         this.identifierPolicy = Objects.requireNonNull(identifierPolicy, "identifierPolicy must not be null");
         this.reservedWordProvider = Objects.requireNonNull(reservedWordProvider, "reservedWordProvider must not be null");
@@ -45,6 +48,11 @@ public abstract class AbstractDatabaseDialect implements DatabaseDialect {
     @Override
     public final DdlSyntax ddlSyntax() {
         return ddlSyntax;
+    }
+
+    @Override
+    public final DdlGenerationPolicy ddlGenerationPolicy() {
+        return ddlGenerationPolicy;
     }
 
     @Override

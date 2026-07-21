@@ -8,6 +8,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /** Selects self-describing vendor column generators without conditionals in the engine. */
+/** @deprecated Use DatabaseDdlPluginRegistry. Scheduled for removal in Phase 3.6. */
+@Deprecated(forRemoval = true, since = "3.4")
 public final class ColumnDefinitionGeneratorRegistry {
     private final Map<DatabaseProduct, ColumnDefinitionGenerator> generators;
 

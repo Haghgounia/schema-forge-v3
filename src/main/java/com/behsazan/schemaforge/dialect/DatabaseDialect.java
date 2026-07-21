@@ -12,6 +12,8 @@ public interface DatabaseDialect {
 
     DdlSyntax ddlSyntax();
 
+    DdlGenerationPolicy ddlGenerationPolicy();
+
     DatabaseCapabilities capabilities();
 
     IdentifierPolicy identifierPolicy();
