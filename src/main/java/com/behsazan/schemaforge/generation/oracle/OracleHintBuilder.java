@@ -12,7 +12,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Deprecated(forRemoval = true)
+/**
+ * @deprecated since 3.3. Replaced by
+ * {@link com.behsazan.schemaforge.generation.ddl.generator.storage.PhysicalOptionsRenderer}
+ * and the vendor-neutral DDL pipeline. Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleHintBuilder {
 
     private final OracleDictionaryCache dictionaryCache;

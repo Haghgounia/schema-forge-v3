@@ -3,7 +3,7 @@ package com.behsazan.schemaforge.api;
 import com.behsazan.schemaforge.api.common.ApiResponse;
 import com.behsazan.schemaforge.api.system.SystemStatusResponse;
 import com.behsazan.schemaforge.configuration.properties.SchemaForgeProperties;
-import com.behsazan.schemaforge.generation.core.DialectRegistry;
+import com.behsazan.schemaforge.dialect.DialectRegistry;
 import com.behsazan.schemaforge.shared.web.CorrelationIdFilter;
 import com.behsazan.schemaforge.specification.core.SpecificationParserRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,7 +34,7 @@ public class SystemController {
 
     @GetMapping("/status")
     public ApiResponse<SystemStatusResponse> status(HttpServletRequest request) {
-        List<String> dialects = dialectRegistry.all().stream().map(d -> d.type().name()).sorted().toList();
+        List<String> dialects = dialectRegistry.all().stream().map(d -> d.product().name()).sorted().toList();
         List<String> parsers = parserRegistry.all().stream().map(p -> p.getClass().getSimpleName()).sorted().toList();
         SystemStatusResponse response = new SystemStatusResponse(
                 "schema-forge-v3", version, "UP", properties.generation().defaultDatabase(), dialects, parsers);

@@ -4,6 +4,11 @@ import com.behsazan.schemaforge.domain.valueobject.DataType;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.dialect.oracle.OracleSqlTypeMapper} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleCanonicalTypeMapper {
     private static final Set<String> DIRECT = Set.of(
             "DATE", "TIMESTAMP", "CLOB", "NCLOB", "BLOB", "RAW", "LONG", "XMLTYPE", "JSON");

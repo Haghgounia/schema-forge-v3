@@ -45,7 +45,7 @@ schemaforge:
     allowed-origin: ${SCHEMAFORGE_UI_ORIGIN:http://localhost:5173}
 
   oracle:
-    enabled: ${SCHEMAFORGE_ORACLE_ENABLED:false}
+    enabled: ${SCHEMAFORGE_ORACLE_ENABLED:true}
     url: ${SCHEMAFORGE_ORACLE_URL:}
     username: ${SCHEMAFORGE_ORACLE_USERNAME:}
     password: ${SCHEMAFORGE_ORACLE_PASSWORD:}
@@ -63,7 +63,7 @@ schemaforge:
       index-tablespace: ${SCHEMAFORGE_LON_INDEX_TABLESPACE:LON_INDEX}
 
   postgresql:
-    enabled: ${SCHEMAFORGE_POSTGRESQL_ENABLED:false}
+    enabled: ${SCHEMAFORGE_POSTGRESQL_ENABLED:true}
     url: ${SCHEMAFORGE_POSTGRESQL_URL:}
     username: ${SCHEMAFORGE_POSTGRESQL_USERNAME:}
     password: ${SCHEMAFORGE_POSTGRESQL_PASSWORD:}

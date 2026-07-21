@@ -2,6 +2,7 @@ package com.behsazan.schemaforge.generation.ddl.generator.table.oracle;
 
 import com.behsazan.schemaforge.dialect.DatabaseCapability;
 import com.behsazan.schemaforge.dialect.DatabaseDialect;
+import com.behsazan.schemaforge.dialect.DatabaseProduct;
 import com.behsazan.schemaforge.domain.model.Column;
 import com.behsazan.schemaforge.generation.ddl.generator.table.ColumnDefinitionGenerator;
 import com.behsazan.schemaforge.generation.ddl.generator.table.DataTypeSqlRenderer;
@@ -10,6 +11,11 @@ import com.behsazan.schemaforge.generation.ddl.generator.table.TableGenerationEx
 import java.util.Objects;
 
 public final class OracleColumnDefinitionGenerator implements ColumnDefinitionGenerator {
+    @Override
+    public DatabaseProduct product() {
+        return DatabaseProduct.ORACLE;
+    }
+
     private final IdentifierSqlRenderer identifierRenderer = new IdentifierSqlRenderer();
     private final DataTypeSqlRenderer dataTypeRenderer = new DataTypeSqlRenderer();
 

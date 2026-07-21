@@ -19,6 +19,11 @@ import java.util.stream.Collectors;
 /**
  * Generates Oracle table constraints without changing the canonical model.
  */
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.ddl.generator.constraint.ConstraintGenerator} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleConstraintGenerator {
 
     public List<SqlSection> generate(DatabaseSchema schema) {

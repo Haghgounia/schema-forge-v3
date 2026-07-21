@@ -2,7 +2,17 @@ package com.behsazan.schemaforge.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.behsazan.schemaforge.generation.oracle.OracleDdlGenerator;
+import com.behsazan.schemaforge.dialect.DialectRegistry;
+import com.behsazan.schemaforge.dialect.oracle.OracleDialect;
+import com.behsazan.schemaforge.dialect.postgresql.PostgreSqlDialect;
+import com.behsazan.schemaforge.generation.core.DdlGenerationEngine;
+import com.behsazan.schemaforge.generation.ddl.generator.table.ColumnDefinitionGeneratorRegistry;
+import com.behsazan.schemaforge.generation.ddl.generator.table.oracle.OracleColumnDefinitionGenerator;
+import com.behsazan.schemaforge.generation.ddl.generator.table.postgresql.PostgreSqlColumnDefinitionGenerator;
+import com.behsazan.schemaforge.generation.ddl.renderer.RendererRegistry;
+import com.behsazan.schemaforge.generation.ddl.renderer.oracle.OracleDdlRenderer;
+import com.behsazan.schemaforge.generation.ddl.renderer.postgresql.PostgreSqlDdlRenderer;
+import java.util.List;
 import com.behsazan.schemaforge.packaging.ZipArtifactPackager;
 import com.behsazan.schemaforge.reporting.SchemaExcelWriter;
 import com.behsazan.schemaforge.specification.adapter.docx.DocxSpecificationParser;
@@ -24,8 +34,17 @@ import org.junit.jupiter.api.Test;
 class ArtifactGenerationServiceTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-20T10:30:25Z"), ZoneOffset.UTC);
     private final ArtifactGenerationService service = new ArtifactGenerationService(
-            new DocxSpecificationParser(), new SchemaExcelWriter(), new OracleDdlGenerator(),
+            new DocxSpecificationParser(), new SchemaExcelWriter(), ddlEngine(),
             new ZipArtifactPackager(), clock);
+
+    private static DdlGenerationEngine ddlEngine() {
+        return new DdlGenerationEngine(
+                new DialectRegistry(List.of(new OracleDialect(), new PostgreSqlDialect())),
+                new RendererRegistry(List.of(new OracleDdlRenderer(), new PostgreSqlDdlRenderer())),
+                new ColumnDefinitionGeneratorRegistry(List.of(
+                        new OracleColumnDefinitionGenerator(),
+                        new PostgreSqlColumnDefinitionGenerator())));
+    }
 
     @Test
     void wordProducesOneZipWithSqlAndExcelNamedByTableAndTimestamp() throws Exception {

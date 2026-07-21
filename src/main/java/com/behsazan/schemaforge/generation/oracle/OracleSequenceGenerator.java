@@ -12,6 +12,11 @@ import java.util.List;
  * Generates Oracle sequence DDL in the legacy SchemaForge format.
  * Sequences are emitted before tables so NEXTVAL defaults are valid during installation.
  */
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.ddl.generator.sequence.SequenceGenerator} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleSequenceGenerator {
 
     public SqlSection generate(DatabaseSchema schema) {

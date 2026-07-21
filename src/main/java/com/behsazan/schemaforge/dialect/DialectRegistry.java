@@ -31,6 +31,14 @@ public final class DialectRegistry {
         return dialect;
     }
 
+    public Collection<DatabaseDialect> all() {
+        return dialects.values();
+    }
+
+    public java.util.Set<DatabaseProduct> products() {
+        return dialects.keySet();
+    }
+
     public boolean contains(DatabaseProduct product) {
         return dialects.containsKey(product);
     }

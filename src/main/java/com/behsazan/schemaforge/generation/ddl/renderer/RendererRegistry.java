@@ -31,6 +31,14 @@ public final class RendererRegistry {
         return renderer;
     }
 
+    public Collection<DdlRenderer> all() {
+        return renderers.values();
+    }
+
+    public java.util.Set<DatabaseProduct> products() {
+        return renderers.keySet();
+    }
+
     public boolean supports(DatabaseProduct product) {
         return renderers.containsKey(Objects.requireNonNull(product, "product must not be null"));
     }

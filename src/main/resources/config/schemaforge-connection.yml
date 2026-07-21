@@ -5,3 +5,8 @@ schemaforge:
       username: SYSTEM
       password: Oracle123
       driver: oracle.jdbc.OracleDriver
+  postgresql:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5433/mydb
+    username: postgres
+    password: 123456

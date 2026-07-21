@@ -1,15 +1,14 @@
 package com.behsazan.schemaforge.application;
 
-import com.behsazan.schemaforge.database.service.DatabaseDictionaryCache;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
 import com.behsazan.schemaforge.domain.model.Table;
 import com.behsazan.schemaforge.generation.artifact.ArtifactBundle;
-import com.behsazan.schemaforge.generation.oracle.OracleDdlGenerator;
+import com.behsazan.schemaforge.dialect.DatabaseProduct;
+import com.behsazan.schemaforge.generation.core.DdlGenerationEngine;
+import com.behsazan.schemaforge.generation.core.DdlGenerationRequest;
+import com.behsazan.schemaforge.generation.ddl.model.ScriptOptions;
 import com.behsazan.schemaforge.generation.spi.ArtifactType;
-import com.behsazan.schemaforge.generation.spi.DatabaseType;
 import com.behsazan.schemaforge.generation.spi.GeneratedArtifact;
-import com.behsazan.schemaforge.generation.spi.GenerationContext;
-import com.behsazan.schemaforge.generation.spi.GenerationOptions;
 import com.behsazan.schemaforge.packaging.ZipArtifactPackager;
 import com.behsazan.schemaforge.reporting.SchemaExcelWriter;
 import com.behsazan.schemaforge.specification.adapter.docx.DocxSpecificationParser;
@@ -30,7 +29,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -41,7 +39,7 @@ public final class ArtifactGenerationService {
 
     private final DocxSpecificationParser parser;
     private final SchemaExcelWriter excelWriter;
-    private final OracleDdlGenerator ddlGenerator;
+    private final DdlGenerationEngine ddlGenerationEngine;
     private final ZipArtifactPackager packager;
     private final Clock clock;
 
@@ -49,21 +47,20 @@ public final class ArtifactGenerationService {
     public ArtifactGenerationService(
             DocxSpecificationParser parser,
             SchemaExcelWriter excelWriter,
-            ObjectProvider<DatabaseDictionaryCache> databaseDictionaryCacheProvider) {
-        this(parser, excelWriter,
-                new OracleDdlGenerator(databaseDictionaryCacheProvider.getIfAvailable()),
+            DdlGenerationEngine ddlGenerationEngine) {
+        this(parser, excelWriter, ddlGenerationEngine,
                 new ZipArtifactPackager(), Clock.systemDefaultZone());
     }
 
     ArtifactGenerationService(
             DocxSpecificationParser parser,
             SchemaExcelWriter excelWriter,
-            OracleDdlGenerator ddlGenerator,
+            DdlGenerationEngine ddlGenerationEngine,
             ZipArtifactPackager packager,
             Clock clock) {
         this.parser = parser;
         this.excelWriter = excelWriter;
-        this.ddlGenerator = ddlGenerator;
+        this.ddlGenerationEngine = ddlGenerationEngine;
         this.packager = packager;
         this.clock = clock;
     }
@@ -118,13 +115,12 @@ public final class ArtifactGenerationService {
     }
 
     private List<GeneratedArtifact> artifacts(DatabaseSchema schema, String baseName) {
-        GenerationContext context = new GenerationContext(
-                schema, DatabaseType.ORACLE, GenerationOptions.defaults(), clock);
-        var ddlResult = ddlGenerator.generate(context);
-        if (ddlResult.hasErrors() || ddlResult.artifacts().isEmpty()) {
-            throw new IllegalStateException("Oracle SQL generation failed for " + baseName);
+        var ddlResult = ddlGenerationEngine.generate(DdlGenerationRequest.of(
+                schema, DatabaseProduct.ORACLE, ScriptOptions.defaults(), clock));
+        if (ddlResult.renderedDdl().isEmpty()) {
+            throw new IllegalStateException("Oracle SQL generation produced an empty script for " + baseName);
         }
-        byte[] sql = ddlResult.artifacts().getFirst().content();
+        byte[] sql = ddlResult.ddl().getBytes(java.nio.charset.StandardCharsets.UTF_8);
         byte[] excel = excelWriter.write(schema);
         return List.of(
                 new GeneratedArtifact(baseName + ".sql", ArtifactType.SQL, sql, 100, "application/sql; charset=UTF-8"),

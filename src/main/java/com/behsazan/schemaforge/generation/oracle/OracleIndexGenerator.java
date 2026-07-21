@@ -14,6 +14,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Generates standalone Oracle indexes after table constraints. */
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.ddl.generator.index.IndexGenerator} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleIndexGenerator {
 
     public SqlSection generate(DatabaseSchema schema) {

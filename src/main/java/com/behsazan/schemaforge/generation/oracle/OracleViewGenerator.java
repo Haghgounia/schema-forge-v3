@@ -9,6 +9,11 @@ import java.util.Comparator;
 import java.util.List;
 
 /** Generates Oracle views and materialized views after tables and indexes. */
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.ddl.generator.schema.SchemaScriptGenerator} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleViewGenerator {
 
     public List<SqlSection> generate(DatabaseSchema schema, boolean includeComments) {

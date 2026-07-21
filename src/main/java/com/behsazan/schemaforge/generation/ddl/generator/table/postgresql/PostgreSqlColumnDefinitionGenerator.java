@@ -2,11 +2,17 @@ package com.behsazan.schemaforge.generation.ddl.generator.table.postgresql;
 
 import com.behsazan.schemaforge.dialect.DatabaseCapability;
 import com.behsazan.schemaforge.dialect.DatabaseDialect;
+import com.behsazan.schemaforge.dialect.DatabaseProduct;
 import com.behsazan.schemaforge.domain.model.Column;
 import com.behsazan.schemaforge.generation.ddl.generator.table.*;
 import java.util.Objects;
 
 public final class PostgreSqlColumnDefinitionGenerator implements ColumnDefinitionGenerator {
+    @Override
+    public DatabaseProduct product() {
+        return DatabaseProduct.POSTGRESQL;
+    }
+
     private final IdentifierSqlRenderer identifiers = new IdentifierSqlRenderer();
     private final DataTypeSqlRenderer dataTypes = new DataTypeSqlRenderer();
     @Override public String generate(Column column, DatabaseDialect dialect) {

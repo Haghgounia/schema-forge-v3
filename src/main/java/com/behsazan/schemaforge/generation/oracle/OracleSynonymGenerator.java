@@ -9,6 +9,11 @@ import java.util.Comparator;
 import java.util.List;
 
 /** Generates private and public Oracle synonyms after views. */
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.ddl.generator.schema.SchemaScriptGenerator} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleSynonymGenerator {
 
     public SqlSection generate(DatabaseSchema schema) {

@@ -1,4 +1,14 @@
 
+## 2026-07-21 - Phase 3.3 plugin architecture and deprecation pass
+
+- Made `ColumnDefinitionGenerator` a self-describing database plugin via `product()`.
+- Replaced hard-coded column generator registrations with Spring list discovery.
+- Unified system status reporting on the active `com.behsazan.schemaforge.dialect.DialectRegistry`.
+- Added registry introspection for registered dialects, renderers, and column generators.
+- Marked the retired Oracle generation pipeline and legacy generation SPI/registry with
+  `@Deprecated(forRemoval = true, since = "3.3")`; removal remains scheduled for Phase 3.6.
+- Kept deprecated classes binary/source compatible so regression tests and downstream callers can migrate safely.
+
 ## Index Engine v1
 
 - Added standalone `CREATE INDEX`, `CREATE UNIQUE INDEX`, and Oracle `CREATE BITMAP INDEX` generation.
@@ -160,3 +170,11 @@
 - New column names are accepted without datatype warnings.
 - Oracle dictionary failures now fall back to zero/empty metadata without stopping generation.
 - Removed duplicate Spring registration of the deprecated JdbcOracleMetadataRepository adapter.
+
+## 2026-07-21 - Phase 3.2 DDL Engine Extraction
+
+- Added vendor-neutral `DdlGenerationEngine`, request, and result types.
+- Added registry-based selection of vendor-specific column definition generators.
+- Added Spring composition for Oracle and PostgreSQL dialects and renderers.
+- Migrated `ArtifactGenerationService` away from `generation.oracle.OracleDdlGenerator`.
+- Preserved Oracle as the current default output target while removing the application-layer Oracle generator dependency.

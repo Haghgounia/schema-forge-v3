@@ -7,6 +7,11 @@ import com.behsazan.schemaforge.generation.spi.GenerationResult;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.core.DdlGenerationEngine}.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class GenerationService {
     private final DialectRegistry registry;
 

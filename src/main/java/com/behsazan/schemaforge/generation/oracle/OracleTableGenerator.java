@@ -13,6 +13,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.ddl.generator.table.TableDdlGenerator} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleTableGenerator {
     private final OracleCanonicalTypeMapper typeMapper;
     private final OracleColumnMetadataInspector metadataInspector;

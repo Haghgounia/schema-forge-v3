@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SchemaForgeConfiguration {
     @Bean
-    DialectRegistry dialectRegistry(List<DatabaseDialect> dialects) {
+    DialectRegistry legacyDialectRegistry(List<DatabaseDialect> dialects) {
         return new DialectRegistry(dialects);
     }
 

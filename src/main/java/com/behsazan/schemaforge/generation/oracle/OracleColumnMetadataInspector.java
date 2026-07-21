@@ -11,6 +11,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Applies target-database dictionary rules to one Oracle output column. */
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.database.service.DatabaseDictionaryCache} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 final class OracleColumnMetadataInspector {
 
     private final DatabaseDictionaryCache dictionaryCache;

@@ -14,6 +14,11 @@ import com.behsazan.schemaforge.generation.spi.GenerationSeverity;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @deprecated since 3.3. Replaced by {@link com.behsazan.schemaforge.generation.core.DdlGenerationEngine} or the vendor-neutral DDL pipeline.
+ * Scheduled for removal in Phase 3.6.
+ */
+@Deprecated(forRemoval = true, since = "3.3")
 public final class OracleDdlGenerator implements DdlGenerator {
     private final OracleSequenceGenerator sequenceGenerator;
     private final OracleTableGenerator tableGenerator;
