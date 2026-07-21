@@ -3,8 +3,8 @@ spring:
     name: schema-forge-v3
   servlet:
     multipart:
-      max-file-size: 500MB
-      max-request-size: 500MB
+      max-file-size: ${SCHEMAFORGE_MAX_FILE_SIZE:500MB}
+      max-request-size: ${SCHEMAFORGE_MAX_REQUEST_SIZE:500MB}
   jackson:
     default-property-inclusion: non_null
 
@@ -15,17 +15,32 @@ server:
     include-message: never
     include-stacktrace: never
 
+springdoc:
+  api-docs:
+    enabled: ${SCHEMAFORGE_API_DOCS_ENABLED:true}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SCHEMAFORGE_SWAGGER_ENABLED:true}
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    try-it-out-enabled: true
+
 schemaforge:
   build:
     version: "@project.version@"
+
   generation:
     default-database: ${SCHEMAFORGE_DEFAULT_DATABASE:ORACLE}
-    include-rollback: true
-    include-comments: true
-    include-dba-hints: true
+    include-rollback: ${SCHEMAFORGE_INCLUDE_ROLLBACK:true}
+    include-comments: ${SCHEMAFORGE_INCLUDE_COMMENTS:true}
+    include-dba-hints: ${SCHEMAFORGE_INCLUDE_DBA_HINTS:true}
+
   workspace:
     root: ${SCHEMAFORGE_WORKSPACE:./work}
-    cleanup-on-startup: false
+    cleanup-on-startup: ${SCHEMAFORGE_WORKSPACE_CLEANUP:false}
+
   web:
     allowed-origin: ${SCHEMAFORGE_UI_ORIGIN:http://localhost:5173}
 
@@ -35,25 +50,37 @@ schemaforge:
     username: ${SCHEMAFORGE_ORACLE_USERNAME:}
     password: ${SCHEMAFORGE_ORACLE_PASSWORD:}
     query-timeout-seconds: ${SCHEMAFORGE_ORACLE_QUERY_TIMEOUT_SECONDS:60}
+
   oracle-schemas:
     BIM:
-      data-tablespace: BIM_DATA
-      index-tablespace: BIM_INDEX
+      data-tablespace: ${SCHEMAFORGE_BIM_DATA_TABLESPACE:BIM_DATA}
+      index-tablespace: ${SCHEMAFORGE_BIM_INDEX_TABLESPACE:BIM_INDEX}
     DPS:
-      data-tablespace: DPS_DATA
-      index-tablespace: DPS_INDEX
+      data-tablespace: ${SCHEMAFORGE_DPS_DATA_TABLESPACE:DPS_DATA}
+      index-tablespace: ${SCHEMAFORGE_DPS_INDEX_TABLESPACE:DPS_INDEX}
     LON:
-      data-tablespace: LON_DATA
-      index-tablespace: LON_INDEX
+      data-tablespace: ${SCHEMAFORGE_LON_DATA_TABLESPACE:LON_DATA}
+      index-tablespace: ${SCHEMAFORGE_LON_INDEX_TABLESPACE:LON_INDEX}
 
-springdoc:
-  api-docs:
-    enabled: true
-    path: /v3/api-docs
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
-    display-request-duration: true
-    try-it-out-enabled: true
+  postgresql:
+    enabled: ${SCHEMAFORGE_POSTGRESQL_ENABLED:false}
+    url: ${SCHEMAFORGE_POSTGRESQL_URL:}
+    username: ${SCHEMAFORGE_POSTGRESQL_USERNAME:}
+    password: ${SCHEMAFORGE_POSTGRESQL_PASSWORD:}
+    query-timeout-seconds: ${SCHEMAFORGE_POSTGRESQL_QUERY_TIMEOUT_SECONDS:60}
+
+  ddl:
+    enabled: ${SCHEMAFORGE_DDL_ENABLED:false}
+    input-directory: ${SCHEMAFORGE_DDL_INPUT_DIRECTORY:}
+    output-directory: ${SCHEMAFORGE_DDL_OUTPUT_DIRECTORY:}
+    dialects:
+      oracle: ${SCHEMAFORGE_DDL_ORACLE_ENABLED:true}
+      postgresql: ${SCHEMAFORGE_DDL_POSTGRESQL_ENABLED:true}
+    options:
+      recursive: ${SCHEMAFORGE_DDL_RECURSIVE:true}
+      strict: ${SCHEMAFORGE_DDL_STRICT:false}
+      overwrite: ${SCHEMAFORGE_DDL_OVERWRITE:true}
+      continue-on-error: ${SCHEMAFORGE_DDL_CONTINUE_ON_ERROR:true}
+    report:
+      csv: ${SCHEMAFORGE_DDL_REPORT_CSV:true}
+      summary: ${SCHEMAFORGE_DDL_REPORT_SUMMARY:true}

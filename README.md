@@ -84,3 +84,64 @@ The Oracle user needs dictionary visibility for the requested schema. Access to 
 ### Oracle schema objects
 
 The Oracle generator currently supports sequences, tables, constraints, indexes, views, materialized views, private synonyms, public synonyms, and comments. Generated objects are emitted in dependency-safe order.
+
+## DDL Completion Pack v1
+The current DDL pipeline supports table/column comments, sequences, object grants, and Oracle table physical options in addition to constraints, foreign keys, and indexes.
+
+Supported Oracle physical options are supplied through `Table.Builder.physicalOption(...)`:
+`TABLESPACE`, `PCTFREE`, `INITRANS`, `MAXTRANS`, `LOGGING`, and `COMPRESS`.
+
+Schema-level scripts can be composed with `SchemaScriptGenerator`, which places sequences before tables and grants after comments.
+
+### PostgreSQL DDL generation
+
+SchemaForge now includes a PostgreSQL dialect for the generic CREATE-schema pipeline. Use `PostgreSqlDialect`, `PostgreSqlColumnDefinitionGenerator`, and `PostgreSqlDdlRenderer` with the existing `TableScriptGenerator`.
+
+The first PostgreSQL increment covers tables, identity columns, primary/unique/check/foreign-key constraints, normal and unique indexes, comments, sequences, grants, and table tablespaces. Canonical Oracle-style type names such as `VARCHAR2`, `NUMBER`, `CLOB`, and `BLOB` are translated to PostgreSQL equivalents during rendering.
+
+## Batch DOCX to Oracle/PostgreSQL DDL test
+
+`DocxDirectoryDdlGenerationTest` reads the batch configuration from
+`src/main/resources/application.yaml` under `schemaforge.ddl`.
+
+Configure absolute directories outside the project:
+
+```yaml
+schemaforge:
+  ddl:
+    enabled: true
+    input-directory: D:/SchemaDocuments
+    output-directory: D:/SchemaForgeOutput/generated-ddl
+    dialects:
+      oracle: true
+      postgresql: true
+    options:
+      recursive: true
+      strict: false
+      overwrite: true
+      continue-on-error: true
+    report:
+      csv: true
+      summary: true
+```
+
+Run the manual batch test:
+
+```bat
+mvn -Dtest=DocxDirectoryDdlGenerationTest test
+```
+
+Generated output:
+
+```text
+D:/SchemaForgeOutput/generated-ddl/
+  oracle/
+  postgresql/
+  generation-results.csv
+```
+
+When `schemaforge.ddl.enabled=false`, the manual test is skipped during a normal
+build. Secrets and machine-specific paths can be overridden with environment
+variables such as `SCHEMAFORGE_DDL_INPUT_DIRECTORY` and
+`SCHEMAFORGE_DDL_OUTPUT_DIRECTORY`.
+

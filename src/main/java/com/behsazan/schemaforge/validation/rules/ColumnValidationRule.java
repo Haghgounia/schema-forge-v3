@@ -5,21 +5,11 @@ import com.behsazan.schemaforge.domain.model.Table;
 import com.behsazan.schemaforge.validation.core.ValidationContext;
 import com.behsazan.schemaforge.validation.core.ValidationRule;
 import com.behsazan.schemaforge.validation.domain.ValidationCode;
-import com.behsazan.schemaforge.validation.oracle.OracleDataTypeValidator;
 
 import java.util.Objects;
 
-/** Validates Oracle-specific column rules. */
+/** Validates column rules using the active database dialect. */
 public final class ColumnValidationRule implements ValidationRule {
-    private final OracleDataTypeValidator dataTypeValidator;
-
-    public ColumnValidationRule() {
-        this(new OracleDataTypeValidator());
-    }
-
-    ColumnValidationRule(OracleDataTypeValidator dataTypeValidator) {
-        this.dataTypeValidator = Objects.requireNonNull(dataTypeValidator);
-    }
 
     @Override
     public void validate(ValidationContext context) {
@@ -30,12 +20,13 @@ public final class ColumnValidationRule implements ValidationRule {
         }
         for (Table table : schema.tables()) {
             table.columns().forEach(column -> {
-                RuleSupport.validateOracleName(context, column.name(), "column");
-                try {
-                    dataTypeValidator.requireValid(RuleSupport.render(column.dataType()));
-                } catch (IllegalArgumentException exception) {
+                RuleSupport.validateName(context, column.name(), "column");
+                String declaration = RuleSupport.render(column.dataType());
+                if (!RuleSupport.dialect(context).dataTypeRules().supports(declaration)) {
                     RuleSupport.addError(context, ValidationCode.UNSUPPORTED_DATA_TYPE,
-                            table.qualifiedName() + "." + column.name().value(), exception.getMessage());
+                            table.qualifiedName() + "." + column.name().value(),
+                            "Unsupported " + RuleSupport.dialect(context).name()
+                                    + " data type: " + declaration);
                 }
             });
         }

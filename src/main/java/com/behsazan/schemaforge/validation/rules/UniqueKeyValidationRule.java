@@ -20,7 +20,7 @@ public final class UniqueKeyValidationRule implements ValidationRule {
         schema.tables().forEach(table -> {
             Set<String> names = new HashSet<>();
             table.uniqueKeys().forEach(key -> {
-                RuleSupport.validateOracleName(context, key.name(), "unique key");
+                RuleSupport.validateName(context, key.name(), "unique key");
                 Identifier name = key.name();
                 if (name != null && !names.add(name.normalized())) {
                     RuleSupport.addError(context, ValidationCode.DUPLICATE_CONSTRAINT,

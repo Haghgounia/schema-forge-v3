@@ -1,14 +1,13 @@
 package com.behsazan.schemaforge.database.spi;
 
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
-import com.behsazan.schemaforge.generation.spi.DatabaseType;
 
 /**
- * DBMS-neutral service provider interface for reading live database metadata.
+ * DBMS-neutral service-provider interface for reading live database metadata.
+ * Implementations are vendor adapters such as Oracle, DB2 for z/OS, and
+ * PostgreSQL.
  */
-public interface DatabaseMetadataProvider {
-
-    DatabaseType databaseType();
+public interface DatabaseMetadataProvider extends DatabaseDictionaryProvider {
 
     DatabaseSchema inspectSchema(String schemaName);
 }

@@ -14,43 +14,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Oracle metadata provider contract. Oracle dictionary details stay behind this
- * adapter while application services depend only on DatabaseMetadataProvider.
- */
+/** Oracle adapter contract. Vendor-specific dictionary SQL stays behind it. */
 public interface OracleMetadataProvider extends DatabaseMetadataProvider {
-
     boolean schemaExists(String schema);
-
     boolean tablespaceExists(String tablespace);
-
     boolean tableExists(String owner, String tableName);
-
     List<String> findTableNames(String owner);
-
     String findTableComment(String owner, String tableName);
-
     List<ColumnState> findColumns(String owner, String tableName);
-
     List<ConstraintState> findConstraints(String owner, String tableName);
-
     List<IndexState> findIndexes(String owner, String tableName);
-
     List<SequenceState> findSequences(String owner);
-
     List<ViewState> findViews(String owner);
-
     List<ViewState> findMaterializedViews(String owner);
-
     List<SynonymState> findSynonyms(String owner);
-
     List<TriggerState> findTriggers(String owner);
-
     List<RoutineState> findStandaloneRoutines(String owner);
-
-    Set<String> loadReservedWords();
-
-    Map<String, Integer> loadColumnUsageCounts();
-
-    Map<String, List<ColumnDataTypeUsage>> loadColumnDataTypeUsages();
+    @Override Set<String> loadReservedWords();
+    @Override Map<String, Integer> loadColumnUsageCounts();
+    @Override Map<String, List<ColumnDataTypeUsage>> loadColumnDataTypeUsages();
 }

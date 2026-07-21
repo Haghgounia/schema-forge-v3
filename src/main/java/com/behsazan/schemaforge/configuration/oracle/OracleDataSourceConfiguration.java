@@ -4,6 +4,7 @@ import javax.sql.DataSource;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -11,7 +12,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @ConditionalOnProperty(prefix = "schemaforge.oracle", name = "enabled", havingValue = "true")
 public class OracleDataSourceConfiguration {
 
-    @Bean
+    @Bean("oracleDataSource")
     DataSource oracleDataSource(OracleConnectionProperties properties) {
         requireText(properties.url(), "schemaforge.oracle.url");
         requireText(properties.username(), "schemaforge.oracle.username");
@@ -25,9 +26,9 @@ public class OracleDataSourceConfiguration {
         return dataSource;
     }
 
-    @Bean
+    @Bean("oracleJdbcTemplate")
     NamedParameterJdbcTemplate oracleJdbcTemplate(
-            DataSource oracleDataSource,
+            @Qualifier("oracleDataSource") DataSource oracleDataSource,
             OracleConnectionProperties properties) {
         NamedParameterJdbcTemplate template = new NamedParameterJdbcTemplate(oracleDataSource);
         template.getJdbcTemplate().setQueryTimeout(properties.queryTimeoutSeconds());

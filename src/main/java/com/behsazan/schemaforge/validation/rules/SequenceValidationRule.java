@@ -16,7 +16,7 @@ public final class SequenceValidationRule implements ValidationRule {
         DatabaseSchema schema = context.get(RuleSupport.ATTRIBUTE_SCHEMA);
         if (schema == null) return;
         schema.sequences().forEach(sequence -> {
-            RuleSupport.validateOracleName(context, sequence.qualifiedName().name(), "sequence");
+            RuleSupport.validateName(context, sequence.qualifiedName().name(), "sequence");
             if (!hasValidRange(sequence)) {
                 RuleSupport.addError(context, ValidationCode.INVALID_SEQUENCE,
                         sequence.qualifiedName().toString(),

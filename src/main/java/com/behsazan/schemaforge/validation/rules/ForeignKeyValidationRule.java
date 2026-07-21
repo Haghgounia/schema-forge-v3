@@ -22,7 +22,7 @@ public final class ForeignKeyValidationRule implements ValidationRule {
         schema.tables().forEach(table -> {
             Set<String> names = new HashSet<>();
             table.foreignKeys().forEach(fk -> {
-                RuleSupport.validateOracleName(context, fk.name(), "foreign key");
+                RuleSupport.validateName(context, fk.name(), "foreign key");
                 if (fk.name() != null && !names.add(fk.name().normalized())) {
                     RuleSupport.addError(context, ValidationCode.DUPLICATE_CONSTRAINT,
                             fk.name().value(), "Duplicate foreign-key name in table " + table.qualifiedName() + ".");

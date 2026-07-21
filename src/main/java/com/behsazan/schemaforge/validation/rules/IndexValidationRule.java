@@ -21,7 +21,7 @@ public final class IndexValidationRule implements ValidationRule {
         schema.tables().forEach(table -> {
             Set<String> names = new HashSet<>();
             table.indexes().forEach(index -> {
-                RuleSupport.validateOracleName(context, index.name(), "index");
+                RuleSupport.validateName(context, index.name(), "index");
                 if (index.name() != null && !names.add(index.name().normalized())) {
                     RuleSupport.addError(context, ValidationCode.DUPLICATE_INDEX,
                             index.name().value(), "Duplicate index name in table " + table.qualifiedName() + ".");

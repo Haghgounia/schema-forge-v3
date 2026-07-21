@@ -1,5 +1,7 @@
 package com.behsazan.schemaforge.generation.oracle;
 
+import com.behsazan.schemaforge.database.oracle.OracleDictionaryCache;
+import com.behsazan.schemaforge.database.service.DatabaseDictionaryCache;
 import com.behsazan.schemaforge.generation.model.SqlDocument;
 import com.behsazan.schemaforge.generation.model.SqlSection;
 import com.behsazan.schemaforge.generation.spi.ArtifactType;
@@ -22,7 +24,17 @@ public final class OracleDdlGenerator implements DdlGenerator {
     private final OracleSqlRenderer renderer;
 
     public OracleDdlGenerator() {
-        this(new OracleSequenceGenerator(), new OracleTableGenerator(), new OracleConstraintGenerator(),
+        this((DatabaseDictionaryCache) null);
+    }
+
+    /** @deprecated Use the DBMS-neutral DatabaseDictionaryCache constructor. */
+    @Deprecated(forRemoval = true)
+    public OracleDdlGenerator(OracleDictionaryCache dictionaryCache) {
+        this(dictionaryCache == null ? null : dictionaryCache.delegate());
+    }
+
+    public OracleDdlGenerator(DatabaseDictionaryCache dictionaryCache) {
+        this(new OracleSequenceGenerator(), new OracleTableGenerator(dictionaryCache), new OracleConstraintGenerator(),
                 new OracleIndexGenerator(), new OracleViewGenerator(), new OracleSynonymGenerator(),
                 new OracleSqlRenderer());
     }

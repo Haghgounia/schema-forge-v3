@@ -15,7 +15,7 @@ public final class PrimaryKeyValidationRule implements ValidationRule {
         DatabaseSchema schema = context.get(RuleSupport.ATTRIBUTE_SCHEMA);
         if (schema == null) return;
         schema.tables().forEach(table -> table.primaryKey().ifPresent(pk -> {
-            RuleSupport.validateOracleName(context, pk.name(), "primary key");
+            RuleSupport.validateName(context, pk.name(), "primary key");
             if (RuleSupport.hasDuplicates(pk.columns())) {
                 RuleSupport.addError(context, ValidationCode.INVALID_PRIMARY_KEY,
                         pk.name() == null ? table.qualifiedName().toString() : pk.name().value(),

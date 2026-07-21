@@ -11,7 +11,12 @@ public final class StandardDataTypeRules implements DataTypeRules {
 
     @Override
     public boolean supports(String dataTypeName) {
-        return dataTypeName != null && TYPES.contains(normalize(dataTypeName));
+        if (dataTypeName == null) {
+            return false;
+        }
+        String normalized = normalize(dataTypeName);
+        String baseType = normalized.replaceFirst("\\s*\\(.*$", "");
+        return TYPES.contains(baseType);
     }
 
     @Override

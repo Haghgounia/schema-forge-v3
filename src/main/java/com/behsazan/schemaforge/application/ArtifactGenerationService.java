@@ -1,5 +1,6 @@
 package com.behsazan.schemaforge.application;
 
+import com.behsazan.schemaforge.database.service.DatabaseDictionaryCache;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
 import com.behsazan.schemaforge.domain.model.Table;
 import com.behsazan.schemaforge.generation.artifact.ArtifactBundle;
@@ -29,6 +30,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -44,8 +46,13 @@ public final class ArtifactGenerationService {
     private final Clock clock;
 
     @Autowired
-    public ArtifactGenerationService(DocxSpecificationParser parser, SchemaExcelWriter excelWriter) {
-        this(parser, excelWriter, new OracleDdlGenerator(), new ZipArtifactPackager(), Clock.systemDefaultZone());
+    public ArtifactGenerationService(
+            DocxSpecificationParser parser,
+            SchemaExcelWriter excelWriter,
+            ObjectProvider<DatabaseDictionaryCache> databaseDictionaryCacheProvider) {
+        this(parser, excelWriter,
+                new OracleDdlGenerator(databaseDictionaryCacheProvider.getIfAvailable()),
+                new ZipArtifactPackager(), Clock.systemDefaultZone());
     }
 
     ArtifactGenerationService(

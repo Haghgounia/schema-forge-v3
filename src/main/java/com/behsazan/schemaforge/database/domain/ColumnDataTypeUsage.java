@@ -13,16 +13,17 @@ public record ColumnDataTypeUsage(
     public String typeSignature() {
         String normalizedType = dataType == null ? "" : dataType.trim().toUpperCase(Locale.ROOT);
         return switch (normalizedType) {
-            case "NUMBER" -> numberSignature();
-            case "VARCHAR2", "VARCHAR", "CHAR", "NVARCHAR2", "NCHAR" -> characterSignature(normalizedType);
+            case "NUMBER", "NUMERIC", "DECIMAL" -> numericSignature(normalizedType);
+            case "VARCHAR2", "VARCHAR", "CHAR", "NVARCHAR2", "NCHAR",
+                    "CHARACTER VARYING", "CHARACTER", "BIT VARYING", "BIT" -> characterSignature(normalizedType);
             default -> normalizedType;
         };
     }
 
-    private String numberSignature() {
-        if (dataPrecision == null) return "NUMBER";
-        if (dataScale == null || dataScale == 0) return "NUMBER(" + dataPrecision + ")";
-        return "NUMBER(" + dataPrecision + "," + dataScale + ")";
+    private String numericSignature(String normalizedType) {
+        if (dataPrecision == null) return normalizedType;
+        if (dataScale == null || dataScale == 0) return normalizedType + "(" + dataPrecision + ")";
+        return normalizedType + "(" + dataPrecision + "," + dataScale + ")";
     }
 
     private String characterSignature(String normalizedType) {

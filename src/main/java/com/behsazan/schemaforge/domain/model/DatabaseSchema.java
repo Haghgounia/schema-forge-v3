@@ -14,12 +14,13 @@ public final class DatabaseSchema {
     private final List<Synonym> synonyms;
     private final List<Trigger> triggers;
     private final List<Routine> routines;
+    private final List<Grant> grants;
     private final Map<String,String> metadata;
 
     private DatabaseSchema(Builder b) {
         name = b.name; description = b.description == null ? Description.empty() : b.description;
         tables = List.copyOf(b.tables); sequences = List.copyOf(b.sequences); views = List.copyOf(b.views);
-        synonyms = List.copyOf(b.synonyms); triggers = List.copyOf(b.triggers); routines = List.copyOf(b.routines); metadata = Map.copyOf(b.metadata);
+        synonyms = List.copyOf(b.synonyms); triggers = List.copyOf(b.triggers); routines = List.copyOf(b.routines); grants = List.copyOf(b.grants); metadata = Map.copyOf(b.metadata);
         ensureUnique(tables.stream().map(Table::qualifiedName).toList(), "table");
         ensureUnique(sequences.stream().map(Sequence::qualifiedName).toList(), "sequence");
         ensureUnique(views.stream().map(View::qualifiedName).toList(), "view");
@@ -32,6 +33,7 @@ public final class DatabaseSchema {
     public List<Table> tables() { return tables; } public List<Sequence> sequences() { return sequences; }
     public List<View> views() { return views; } public List<Synonym> synonyms() { return synonyms; }
     public List<Trigger> triggers() { return triggers; } public List<Routine> routines() { return routines; }
+    public List<Grant> grants() { return grants; }
     public Map<String,String> metadata() { return metadata; }
     public Optional<Table> findTable(String tableName) { String n = Identifier.of(tableName).normalized(); return tables.stream().filter(t -> t.qualifiedName().name().normalized().equals(n)).findFirst(); }
 
@@ -40,6 +42,7 @@ public final class DatabaseSchema {
         private final List<Table> tables = new ArrayList<>(); private final List<Sequence> sequences = new ArrayList<>();
         private final List<View> views = new ArrayList<>(); private final List<Synonym> synonyms = new ArrayList<>();
         private final List<Trigger> triggers = new ArrayList<>(); private final List<Routine> routines = new ArrayList<>();
+        private final List<Grant> grants = new ArrayList<>();
         private final Map<String,String> metadata = new LinkedHashMap<>();
         private Builder(Identifier name) { this.name = name; }
         public Builder description(String value) { description = new Description(value); return this; }
@@ -49,6 +52,7 @@ public final class DatabaseSchema {
         public Builder addSynonym(Synonym value) { synonyms.add(Objects.requireNonNull(value)); return this; }
         public Builder addTrigger(Trigger value) { triggers.add(Objects.requireNonNull(value)); return this; }
         public Builder addRoutine(Routine value) { routines.add(Objects.requireNonNull(value)); return this; }
+        public Builder addGrant(Grant value) { grants.add(Objects.requireNonNull(value)); return this; }
         public Builder metadata(String key, String value) { metadata.put(Objects.requireNonNull(key), Objects.requireNonNull(value)); return this; }
         public DatabaseSchema build() { return new DatabaseSchema(this); }
     }

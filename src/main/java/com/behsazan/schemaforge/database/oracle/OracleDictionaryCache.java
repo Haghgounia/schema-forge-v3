@@ -1,72 +1,42 @@
 package com.behsazan.schemaforge.database.oracle;
 
 import com.behsazan.schemaforge.database.domain.ColumnDataTypeUsage;
-import jakarta.annotation.PostConstruct;
-import java.util.Collections;
+import com.behsazan.schemaforge.database.service.DatabaseDictionaryCache;
+import com.behsazan.schemaforge.database.spi.DatabaseDictionaryProvider;
+import com.behsazan.schemaforge.generation.spi.DatabaseType;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
-@Component
-@ConditionalOnProperty(prefix = "schemaforge.oracle", name = "enabled", havingValue = "true")
+/**
+ * @deprecated Use {@link DatabaseDictionaryCache}. This Oracle-only facade is
+ * retained temporarily for source compatibility with phase-1/phase-2 callers.
+ */
+@Deprecated(forRemoval = true)
 public class OracleDictionaryCache {
 
-    private final OracleMetadataProvider repository;
-    private Set<String> reservedWords = Set.of();
-    private Map<String, Integer> columnUsageCounts = Map.of();
-    private Map<String, List<ColumnDataTypeUsage>> columnDataTypeUsages = Map.of();
+    private final DatabaseDictionaryCache delegate;
 
-    public OracleDictionaryCache(OracleMetadataProvider repository) {
-        this.repository = Objects.requireNonNull(repository, "repository must not be null");
+    public OracleDictionaryCache(OracleMetadataProvider provider) {
+        Objects.requireNonNull(provider, "provider must not be null");
+        DatabaseDictionaryProvider oracleAdapter = new DatabaseDictionaryProvider() {
+            @Override public DatabaseType databaseType() { return DatabaseType.ORACLE; }
+            @Override public Set<String> loadReservedWords() { return provider.loadReservedWords(); }
+            @Override public Map<String, Integer> loadColumnUsageCounts() { return provider.loadColumnUsageCounts(); }
+            @Override public Map<String, List<ColumnDataTypeUsage>> loadColumnDataTypeUsages() {
+                return provider.loadColumnDataTypeUsages();
+            }
+        };
+        this.delegate = new DatabaseDictionaryCache(oracleAdapter);
     }
 
-    @PostConstruct
-    public void initialize() {
-        Set<String> loadedReservedWords = repository.loadReservedWords();
-        Map<String, Integer> loadedUsageCounts = repository.loadColumnUsageCounts();
-        Map<String, List<ColumnDataTypeUsage>> loadedDataTypeUsages =
-                repository.loadColumnDataTypeUsages();
-
-        reservedWords = loadedReservedWords == null
-                ? Set.of()
-                : Collections.unmodifiableSet(loadedReservedWords);
-        columnUsageCounts = loadedUsageCounts == null
-                ? Map.of()
-                : Collections.unmodifiableMap(loadedUsageCounts);
-        columnDataTypeUsages = loadedDataTypeUsages == null
-                ? Map.of()
-                : Map.copyOf(loadedDataTypeUsages);
-    }
-
-    public boolean isReservedWord(String word) {
-        return word != null
-                && !word.isBlank()
-                && reservedWords.contains(normalize(word));
-    }
-
-    public int getColumnUsageCount(String columnName) {
-        if (columnName == null || columnName.isBlank()) {
-            return 0;
-        }
-        return columnUsageCounts.getOrDefault(normalize(columnName), 0);
-    }
-
+    public void initialize() { delegate.refresh(DatabaseType.ORACLE); }
+    public void refresh() { initialize(); }
+    public boolean isReservedWord(String word) { return delegate.isReservedWord(DatabaseType.ORACLE, word); }
+    public int getColumnUsageCount(String columnName) { return delegate.getColumnUsageCount(DatabaseType.ORACLE, columnName); }
     public List<ColumnDataTypeUsage> getColumnDataTypeUsages(String columnName) {
-        if (columnName == null || columnName.isBlank()) {
-            return List.of();
-        }
-        return columnDataTypeUsages.getOrDefault(normalize(columnName), List.of());
+        return delegate.getColumnDataTypeUsages(DatabaseType.ORACLE, columnName);
     }
-
-    public void refresh() {
-        initialize();
-    }
-
-    private String normalize(String value) {
-        return value.trim().toUpperCase(Locale.ROOT);
-    }
+    public DatabaseDictionaryCache delegate() { return delegate; }
 }

@@ -1,13 +1,13 @@
 package com.behsazan.schemaforge.validation.rules;
 
+import com.behsazan.schemaforge.dialect.DatabaseDialect;
 import com.behsazan.schemaforge.domain.valueobject.DataType;
 import com.behsazan.schemaforge.domain.valueobject.Identifier;
 import com.behsazan.schemaforge.validation.core.ValidationContext;
+import com.behsazan.schemaforge.validation.core.ValidationDialectResolver;
 import com.behsazan.schemaforge.validation.domain.ValidationCode;
 import com.behsazan.schemaforge.validation.domain.ValidationIssue;
 import com.behsazan.schemaforge.validation.domain.ValidationSeverity;
-import com.behsazan.schemaforge.validation.oracle.OracleLengthValidator;
-import com.behsazan.schemaforge.validation.oracle.OracleReservedWordValidator;
 
 import java.util.HashSet;
 import java.util.List;
@@ -16,9 +16,6 @@ import java.util.Set;
 
 final class RuleSupport {
     static final String ATTRIBUTE_SCHEMA = "schema";
-    private static final int ORACLE_IDENTIFIER_LIMIT = 128;
-    private static final OracleReservedWordValidator RESERVED = new OracleReservedWordValidator();
-    private static final OracleLengthValidator LENGTH = new OracleLengthValidator();
 
     private RuleSupport() {
     }
@@ -27,21 +24,29 @@ final class RuleSupport {
         context.result().addIssue(new ValidationIssue(ValidationSeverity.ERROR, code, objectName, message));
     }
 
-    static void validateOracleName(ValidationContext context, Identifier name, String objectType) {
+    static DatabaseDialect dialect(ValidationContext context) {
+        return ValidationDialectResolver.resolve(context);
+    }
+
+    static void validateName(ValidationContext context, Identifier name, String objectType) {
         if (name == null) {
             return;
         }
+        DatabaseDialect dialect = dialect(context);
         String value = name.value();
-        try {
-            RESERVED.requireNotReserved(value, objectType);
-        } catch (IllegalArgumentException exception) {
-            addError(context, ValidationCode.RESERVED_WORD, value,
-                    objectType + " name is an Oracle reserved word.");
+        String normalized = dialect.identifierRules().normalize(value);
+
+        if (!dialect.identifierRules().isValidUnquotedIdentifier(normalized)) {
+            ValidationCode code = normalized != null
+                    && normalized.length() > dialect.identifierRules().maxIdentifierLength()
+                    ? ValidationCode.IDENTIFIER_TOO_LONG
+                    : ValidationCode.INVALID_IDENTIFIER;
+            addError(context, code, value,
+                    "Invalid " + dialect.name() + " " + objectType + " identifier: " + value);
         }
-        try {
-            LENGTH.requireValidIdentifierLength(value, objectType);
-        } catch (IllegalArgumentException exception) {
-            addError(context, ValidationCode.IDENTIFIER_TOO_LONG, value, exception.getMessage());
+        if (dialect.identifierRules().isReservedWord(normalized)) {
+            addError(context, ValidationCode.RESERVED_WORD, value,
+                    objectType + " name is a reserved word in " + dialect.name() + ".");
         }
     }
 

@@ -1,0 +1,18 @@
+schemaforge:
+  ddl:
+    input-directory: D:/SchemaDocuments
+    output-directory: D:/SchemaReports
+
+    dialects:
+      oracle: true
+      postgresql: true
+
+    options:
+      recursive: true
+      strict: false
+      overwrite: true
+      continue-on-error: true
+
+    report:
+      csv: true
+      summary: true

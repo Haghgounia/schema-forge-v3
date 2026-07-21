@@ -15,7 +15,7 @@ public final class CrossReferenceValidationRule implements ValidationRule {
         DatabaseSchema schema = context.get(RuleSupport.ATTRIBUTE_SCHEMA);
         if (schema == null) return;
         schema.triggers().forEach(trigger -> {
-            RuleSupport.validateOracleName(context, trigger.qualifiedName().name(), "trigger");
+            RuleSupport.validateName(context, trigger.qualifiedName().name(), "trigger");
             boolean tableExists = schema.tables().stream()
                     .anyMatch(table -> table.qualifiedName().toString().equalsIgnoreCase(trigger.table().toString()));
             if (!tableExists) {

@@ -11,4 +11,18 @@ public interface DatabaseDialect {
     DataTypeRules dataTypeRules();
 
     DdlSyntax ddlSyntax();
+
+    DatabaseCapabilities capabilities();
+
+    IdentifierPolicy identifierPolicy();
+
+    ReservedWordProvider reservedWordProvider();
+
+    NamingStrategy namingStrategy();
+
+    SqlTypeMapper sqlTypeMapper();
+
+    default boolean supports(DatabaseCapability capability) {
+        return capabilities().supports(capability);
+    }
 }

@@ -20,12 +20,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.stereotype.Repository;
 
-@Repository
-@ConditionalOnProperty(prefix = "schemaforge.oracle", name = "enabled", havingValue = "true")
+@Deprecated(forRemoval = true)
 public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
 
     private static final String SCHEMA_EXISTS_SQL = "SELECT COUNT(*) FROM ALL_USERS WHERE USERNAME = :schema";

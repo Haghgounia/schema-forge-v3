@@ -1,3 +1,11 @@
+
+## Index Engine v1
+
+- Added standalone `CREATE INDEX`, `CREATE UNIQUE INDEX`, and Oracle `CREATE BITMAP INDEX` generation.
+- Added schema-qualified index names and table names.
+- Added composite index columns with explicit `ASC`/`DESC` ordering.
+- Integrated indexes into `TableScriptGenerator` under `DdlPhase.INDEXES`.
+- Added unit coverage for Oracle index generation and unsupported index types.
 # Changelog
 
 ## 3.0.0-SNAPSHOT - Backend Foundation Increment 01
@@ -125,3 +133,30 @@
 - Added CSV reports for per-file results and unsupported data type expressions.
 - Added a summary report and SQL output for successfully processed documents.
 - Added support for `CHAR` and `BYTE` length semantics in DOCX data type expressions.
+
+## 2026-07-21 - DDL Completion Pack v1
+- Added table and column COMMENT generation with SQL literal escaping.
+- Added CREATE SEQUENCE generation with start, increment, bounds, cycle and cache options.
+- Added object GRANT generation, including WITH GRANT OPTION.
+- Added Oracle physical table options: TABLESPACE, PCTFREE, INITRANS, MAXTRANS, LOGGING and COMPRESS.
+- Added SchemaScriptGenerator to compose existing generators without introducing the proposed larger deployment architecture.
+- Added six tests; expected baseline is 116 tests with 0 failures and 0 errors.
+
+## 2026-07-21 - PostgreSQL DDL Engine v1
+- Added PostgreSQL as a first-class DatabaseProduct and dialect.
+- Added PostgreSQL identifier, reserved-word, naming, capability, DDL syntax and SQL type policies.
+- Added Oracle-to-PostgreSQL canonical type aliases for VARCHAR2, NUMBER, CLOB, BLOB, RAW and related types.
+- Added PostgreSQL column generation with identity, defaults and nullability.
+- Added PostgreSQL DDL rendering with optional psql ON_ERROR_STOP preamble.
+- Added PostgreSQL-specific sequence syntax and index naming behavior.
+- Added PostgreSQL TABLESPACE validation for physical table options.
+- Added four PostgreSQL regression tests; expected baseline is 120 tests with 0 failures and 0 errors.
+
+## 2026-07-21 Oracle dictionary validation wiring
+
+- Wired Oracle column usage counts into generated column definitions.
+- Added Oracle reserved-word error comments for document columns.
+- Added datatype mismatch warnings against the dominant existing Oracle datatype.
+- New column names are accepted without datatype warnings.
+- Oracle dictionary failures now fall back to zero/empty metadata without stopping generation.
+- Removed duplicate Spring registration of the deprecated JdbcOracleMetadataRepository adapter.

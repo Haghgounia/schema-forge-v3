@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -135,7 +136,7 @@ public class JdbcOracleMetadataProvider implements OracleMetadataProvider {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final OracleCanonicalSchemaMapper mapper = new OracleCanonicalSchemaMapper();
 
-    public JdbcOracleMetadataProvider(NamedParameterJdbcTemplate jdbcTemplate) {
+    public JdbcOracleMetadataProvider(@Qualifier("oracleJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
