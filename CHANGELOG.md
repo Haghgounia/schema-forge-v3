@@ -194,3 +194,15 @@
 - Added missing `CREATED_BY`, `CREATED_DATE`, `LAST_MODIFIED_BY`, and `LAST_MODIFIED_DATE` columns to the end of every table.
 - Existing audit columns are preserved and are not duplicated.
 - Standardized generated script names on Gregorian `yyyyMMdd-HHmmss` with 24-hour `HH`.
+
+## 2026-07-21 - Phase 3.6 Robust Parser & Recovery Engine
+
+- Added `DataTypeNormalizer` for common malformed DOCX datatype values.
+- Added `IdentifierSanitizer` for recoverable table, schema, column and constraint names.
+- Added recovery warnings to generated schema metadata:
+  - `recovery.warningCount`
+  - `recovery.warnings`
+- Added conservative recovery for duplicated datatypes, missing parentheses, dot-as-scale separators,
+  attached precision/scale, `TIME_STAMP`, textual notes in datatype cells, and non-positive precision.
+- Added unit tests for datatype and identifier recovery.
+- PostgreSQL identity/sequence bug is intentionally deferred to the next change set.
