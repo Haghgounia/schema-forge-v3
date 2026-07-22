@@ -42,11 +42,25 @@ import java.util.stream.Collectors;
 public class SchemaCompareExcelWriter {
 
     private static final String[] HEADERS = {
-            "COLUMN_USAGE", "DOC_COLUMN_ID", "DOC_COLUMN_NAME", "DOC_COMMENTS",
-            "DOC_DATA_TYPE", "DOC_KEY", "DOC_UNIQUE", "DOC_INDEX", "DOC_REQUIRED",
-            "DOC_DEFAULT", "DB_COLUMN_ID", "DB_COLUMN_NAME", "DB_DATA_TYPE",
-            "DB_NULLABLE", "DB_DEFAULT", "DB_COMMENTS", "DB_INDEX", "DB_UNIQUE",
-            "DB_FOREIGN_KEY", "DIFF"
+            "DOC_COLUMN_ID",
+            "DOC_COLUMN_NAME",
+            "DOC_COMMENTS",
+            "DOC_DATA_TYPE",
+            "DOC_KEY",
+            "DOC_UNIQUE",
+            "DOC_INDEX",
+            "DOC_REQUIRED",
+            "DOC_DEFAULT",
+            "DB_COLUMN_ID",
+            "DB_COLUMN_NAME",
+            "DB_DATA_TYPE",
+            "DB_NULLABLE",
+            "DB_DEFAULT",
+            "DB_COMMENTS",
+            "DB_INDEX",
+            "DB_UNIQUE",
+            "DB_FOREIGN_KEY",
+            "DIFF"
     };
 
     public byte[] write(TableDefinition documentTable, Table databaseTable) {
@@ -58,6 +72,8 @@ public class SchemaCompareExcelWriter {
             Table databaseTable,
             Map<String, Integer> columnUsageCounts) {
 
+
+
         Objects.requireNonNull(documentTable, "documentTable must not be null");
         Objects.requireNonNull(databaseTable, "databaseTable must not be null");
         columnUsageCounts = columnUsageCounts == null ? Map.of() : Map.copyOf(columnUsageCounts);
@@ -68,7 +84,15 @@ public class SchemaCompareExcelWriter {
             Sheet sheet = workbook.createSheet(safeSheetName(documentTable.name()));
             CellStyle headerStyle = createHeaderStyle(workbook);
             CellStyle normalStyle = createNormalStyle(workbook);
-            CellStyle diffStyle = createDiffStyle(workbook);
+
+            CellStyle missingInDatabaseStyle =
+                    createMissingInDatabaseStyle(workbook);
+
+            CellStyle extraInDatabaseStyle =
+                    createExtraInDatabaseStyle(workbook);
+
+            CellStyle changedStyle =
+                    createChangedStyle(workbook);
 
             writeHeader(sheet, headerStyle);
 
@@ -98,13 +122,53 @@ public class SchemaCompareExcelWriter {
                         row,
                         documentTable,
                         documentColumn,
-                        findUsageCount(columnUsageCounts, normalizedName),
                         normalStyle);
                 writeDatabaseSide(row, databaseTable, databaseColumn, normalStyle);
 
-                List<String> differences = compare(documentTable, documentColumn, databaseTable, databaseColumn);
-                setCell(row, 19, String.join(",", differences), differences.isEmpty() ? normalStyle : diffStyle);
-            }
+                List<String> differences =
+                        compare(
+                                documentTable,
+                                documentColumn,
+                                databaseTable,
+                                databaseColumn
+                        );
+
+
+                CellStyle rowStyle = normalStyle;
+
+
+                if (documentColumn != null
+                        && databaseColumn == null) {
+
+                    rowStyle = missingInDatabaseStyle;
+
+                }
+                else if (documentColumn == null
+                        && databaseColumn != null) {
+
+                    rowStyle = extraInDatabaseStyle;
+
+                }
+                else if (!differences.isEmpty()) {
+
+                    rowStyle = changedStyle;
+
+                }
+
+
+                applyRowStyle(
+                        row,
+                        HEADERS.length,
+                        rowStyle
+                );
+
+
+                setCell(
+                        row,
+                        18,
+                        String.join(",", differences),
+                        rowStyle
+                );            }
 
             configureSheet(sheet, orderedNames.size());
             workbook.write(output);
@@ -126,24 +190,24 @@ public class SchemaCompareExcelWriter {
             Row row,
             TableDefinition table,
             ColumnDefinition column,
-            int usageCount,
             CellStyle style) {
 
+
         if (column == null) {
-            fillEmpty(row, 0, 9, style);
+            fillEmpty(row, 0, 8, style);
             return;
         }
 
-        setCell(row, 0, usageCount, style);
-        setCell(row, 1, table.columns().indexOf(column) + 1, style);
-        setCell(row, 2, column.name(), style);
-        setCell(row, 3, column.description(), style);
-        setCell(row, 4, format(column.dataType()), style);
-        setCell(row, 5, documentKey(table, column), style);
-        setCell(row, 6, column.unique() ? "Y" : "N", style);
-        setCell(row, 7, column.indexed() ? "Y" : "N", style);
-        setCell(row, 8, column.nullable() ? "N" : "Y", style);
-        setCell(row, 9, column.defaultValue(), style);
+
+        setCell(row, 0, table.columns().indexOf(column) + 1, style);
+        setCell(row, 1, column.name(), style);
+        setCell(row, 2, column.description(), style);
+        setCell(row, 3, format(column.dataType()), style);
+        setCell(row, 4, documentKey(table, column), style);
+        setCell(row, 5, column.unique() ? "Y" : "N", style);
+        setCell(row, 6, column.indexed() ? "Y" : "N", style);
+        setCell(row, 7, column.nullable() ? "N" : "Y", style);
+        setCell(row, 8, column.defaultValue(), style);
     }
 
     private void writeDatabaseSide(Row row, Table table, Column column, CellStyle style) {
@@ -152,15 +216,15 @@ public class SchemaCompareExcelWriter {
             return;
         }
 
-        setCell(row, 10, column.ordinalPosition(), style);
-        setCell(row, 11, column.name().value(), style);
-        setCell(row, 12, format(column.dataType()), style);
-        setCell(row, 13, column.nullable() ? "Y" : "N", style);
-        setCell(row, 14, column.defaultValue().expression(), style);
-        setCell(row, 15, column.description().value(), style);
-        setCell(row, 16, indexNames(table, column.name(), false), style);
-        setCell(row, 17, indexNames(table, column.name(), true), style);
-        setCell(row, 18, foreignKeyNames(table, column.name()), style);
+        setCell(row, 9, column.ordinalPosition(), style);
+        setCell(row, 10, column.name().value(), style);
+        setCell(row, 11, format(column.dataType()), style);
+        setCell(row, 12, column.nullable() ? "Y" : "N", style);
+        setCell(row, 13, column.defaultValue().expression(), style);
+        setCell(row, 14, column.description().value(), style);
+        setCell(row, 15, indexNames(table, column.name(), false), style);
+        setCell(row, 16, indexNames(table, column.name(), true), style);
+        setCell(row, 17, foreignKeyNames(table, column.name()), style);
     }
 
     private List<String> compare(
@@ -197,10 +261,13 @@ public class SchemaCompareExcelWriter {
         if (documentColumn.indexed() != hasIndex(databaseTable, databaseColumn.name(), false)) {
             differences.add("INDEX");
         }
-        boolean databaseUnique = hasIndex(databaseTable, databaseColumn.name(), true)
-                || inUniqueKey(databaseTable, databaseColumn.name())
-                || inPrimaryKey(databaseTable, databaseColumn.name());
-        if (documentColumn.unique() != databaseUnique && !documentColumn.primaryKey()) {
+        boolean databaseUnique =
+                hasIndex(databaseTable, databaseColumn.name(), true)
+                        || inUniqueKey(databaseTable, databaseColumn.name());
+
+        if (documentColumn.unique() != databaseUnique
+                && !documentColumn.primaryKey()) {
+
             differences.add("UNIQUE");
         }
         if (documentColumn.primaryKey() != inPrimaryKey(databaseTable, databaseColumn.name())) {
@@ -289,14 +356,6 @@ public class SchemaCompareExcelWriter {
         return List.copyOf(names);
     }
 
-    private int findUsageCount(Map<String, Integer> counts, String normalizedName) {
-        return counts.entrySet().stream()
-                .filter(entry -> normalize(entry.getKey()).equals(normalizedName))
-                .map(Map.Entry::getValue)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(0);
-    }
 
     private String format(DataTypeDefinition type) {
         String name = type.name().trim().toUpperCase(Locale.ROOT);
@@ -368,8 +427,58 @@ public class SchemaCompareExcelWriter {
 
     private CellStyle createDiffStyle(XSSFWorkbook workbook) {
         CellStyle style = createBaseStyle(workbook);
-        style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+        style.setFillForegroundColor(IndexedColors.LIGHT_ORANGE.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        return style;
+    }
+
+    private CellStyle createMissingInDatabaseStyle(
+            XSSFWorkbook workbook) {
+
+        CellStyle style = createBaseStyle(workbook);
+
+        style.setFillForegroundColor(
+                IndexedColors.LIGHT_GREEN.getIndex()
+        );
+
+        style.setFillPattern(
+                FillPatternType.SOLID_FOREGROUND
+        );
+
+        return style;
+    }
+
+
+    private CellStyle createExtraInDatabaseStyle(
+            XSSFWorkbook workbook) {
+
+        CellStyle style = createBaseStyle(workbook);
+
+        style.setFillForegroundColor(
+                IndexedColors.ROSE.getIndex()
+        );
+
+        style.setFillPattern(
+                FillPatternType.SOLID_FOREGROUND
+        );
+
+        return style;
+    }
+
+
+    private CellStyle createChangedStyle(
+            XSSFWorkbook workbook) {
+
+        CellStyle style = createBaseStyle(workbook);
+
+        style.setFillForegroundColor(
+                IndexedColors.LIGHT_YELLOW.getIndex()
+        );
+
+        style.setFillPattern(
+                FillPatternType.SOLID_FOREGROUND
+        );
+
         return style;
     }
 
@@ -387,6 +496,23 @@ public class SchemaCompareExcelWriter {
     private void fillEmpty(Row row, int from, int to, CellStyle style) {
         for (int index = from; index <= to; index++) {
             setCell(row, index, "", style);
+        }
+    }
+
+    private void applyRowStyle(
+            Row row,
+            int columnCount,
+            CellStyle style) {
+
+        for (int i = 0; i < columnCount; i++) {
+
+            Cell cell = row.getCell(i);
+
+            if (cell == null) {
+                cell = row.createCell(i);
+            }
+
+            cell.setCellStyle(style);
         }
     }
 

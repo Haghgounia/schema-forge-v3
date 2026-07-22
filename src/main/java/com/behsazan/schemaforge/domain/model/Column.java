@@ -1,3 +1,4 @@
+
 package com.behsazan.schemaforge.domain.model;
 
 import com.behsazan.schemaforge.domain.valueobject.*;
