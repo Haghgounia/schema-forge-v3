@@ -18,6 +18,7 @@ import com.behsazan.schemaforge.domain.valueobject.DefaultValue;
 import com.behsazan.schemaforge.domain.valueobject.Description;
 import com.behsazan.schemaforge.domain.valueobject.Identifier;
 import com.behsazan.schemaforge.domain.valueobject.QualifiedName;
+import com.behsazan.schemaforge.specification.normalization.range.NumericRangeParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
 import com.behsazan.schemaforge.validation.oracle.OracleIdentifierValidator;
@@ -43,6 +44,7 @@ import java.util.regex.Pattern;
 @Component
 public final class DocxSpecificationParser implements SpecificationParser {
     private final OracleIdentifierValidator identifierValidator = new OracleIdentifierValidator();
+    private final NumericRangeParser numericRangeParser = new NumericRangeParser();
     private static final Pattern DATA_TYPE = Pattern.compile(
             "(?i)^([A-Z][A-Z0-9_ ]*?)(?:\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?(?:\\s+(?:CHAR|BYTE))?\\s*\\))?$");
     private static final Pattern GROUP_REFERENCE = Pattern.compile("(?i)^([A-Z][A-Z0-9_$.]*)(?:/([YN]))?$" );
@@ -159,14 +161,22 @@ public final class DocxSpecificationParser implements SpecificationParser {
 
     private void addChecks(Table.Builder table, String tableName, List<ParsedColumn> columns) {
         for (ParsedColumn column : columns) {
-            String expression = firstNonBlank(column.checkConstraint(), column.range());
-            if (expression == null) {
+            String expression = emptyToNull(column.checkConstraint());
+            if (expression != null) {
+                addCheck(table, tableName, column.name(), qualifyCheckExpression(column.name(), expression));
                 continue;
             }
-            table.addCheck(new CheckConstraint(
-                    identifierValidator.toIdentifier("CK_" + tableName + "_" + column.name(), "check constraint"),
-                    qualifyCheckExpression(column.name(), expression)));
+
+            numericRangeParser.toCheckExpression(column.name(), column.range())
+                    .ifPresent(rangeExpression -> addCheck(
+                            table, tableName, column.name(), rangeExpression));
         }
+    }
+
+    private void addCheck(Table.Builder table, String tableName, String columnName, String expression) {
+        table.addCheck(new CheckConstraint(
+                identifierValidator.toIdentifier("CK_" + tableName + "_" + columnName, "check constraint"),
+                expression));
     }
 
     private String qualifyCheckExpression(String columnName, String expression) {
