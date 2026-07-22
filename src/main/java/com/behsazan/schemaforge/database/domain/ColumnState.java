@@ -11,5 +11,6 @@ public record ColumnState(
         Integer scale,
         boolean nullable,
         String defaultValue,
-        String comment) {
+        String comment,
+        boolean identity) {
 }

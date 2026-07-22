@@ -14,7 +14,12 @@ import com.behsazan.schemaforge.generation.ddl.renderer.oracle.OracleDdlRenderer
 import com.behsazan.schemaforge.generation.ddl.renderer.postgresql.PostgreSqlDdlRenderer;
 import java.util.List;
 import com.behsazan.schemaforge.packaging.ZipArtifactPackager;
-import com.behsazan.schemaforge.reporting.SchemaExcelWriter;
+import com.behsazan.schemaforge.reporting.CanonicalSchemaCompareExcelWriter;
+import com.behsazan.schemaforge.application.database.DatabaseMetadataReader;
+import com.behsazan.schemaforge.application.database.DatabaseMetadataReaderRegistry;
+import com.behsazan.schemaforge.dialect.DatabaseProduct;
+import com.behsazan.schemaforge.domain.model.Table;
+import java.util.Optional;
 import com.behsazan.schemaforge.specification.adapter.docx.DocxSpecificationParser;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -34,7 +39,7 @@ import org.junit.jupiter.api.Test;
 class ArtifactGenerationServiceTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-20T10:30:25Z"), ZoneOffset.UTC);
     private final ArtifactGenerationService service = new ArtifactGenerationService(
-            new DocxSpecificationParser(), new SchemaExcelWriter(), ddlEngine(),
+            new DocxSpecificationParser(), ddlEngine(),
             new ZipArtifactPackager(), clock);
 
     private static DdlGenerationEngine ddlEngine() {
@@ -47,18 +52,15 @@ class ArtifactGenerationServiceTest {
     }
 
     @Test
-    void wordProducesOneZipWithSqlAndExcelNamedByTableAndTimestamp() throws Exception {
+    void missingDatabaseTableProducesOnlySql() throws Exception {
         GeneratedZip result = service.generateFromWord("customer.docx", new ByteArrayInputStream(docx("CUSTOMER")));
 
         assertThat(result.fileName()).isEqualTo("CUSTOMER-20260720-103025.zip");
         Map<String, byte[]> entries = unzip(result.content());
-        assertThat(entries).containsOnlyKeys(
-                "CUSTOMER-20260720-103025.sql",
-                "CUSTOMER-20260720-103025.xlsx");
+        assertThat(entries).containsOnlyKeys("CUSTOMER-20260720-103025.sql");
         assertThat(new String(entries.get("CUSTOMER-20260720-103025.sql"), StandardCharsets.UTF_8))
                 .contains("CREATE TABLE APP.CUSTOMER")
                 .contains("PRIMARY KEY (ID)");
-        assertThat(entries.get("CUSTOMER-20260720-103025.xlsx")).isNotEmpty();
     }
 
     @Test
@@ -73,12 +75,44 @@ class ArtifactGenerationServiceTest {
         Map<String, byte[]> entries = unzip(result.content());
         assertThat(entries).containsOnlyKeys(
                 "CUSTOMER-20260720-103025.sql",
-                "CUSTOMER-20260720-103025.xlsx",
-                "ACCOUNT-20260720-103025.sql",
-                "ACCOUNT-20260720-103025.xlsx");
+                "ACCOUNT-20260720-103025.sql");
         assertThat(entries.keySet()).noneMatch(name -> name.endsWith(".zip"));
     }
 
+
+    @Test
+    void existingDatabaseTableProducesOnlyComparisonExcel() throws Exception {
+        DatabaseSchemaHolder holder = databaseTable("CUSTOMER");
+        DatabaseMetadataReader lookup = new DatabaseMetadataReader() {
+            @Override public DatabaseProduct databaseProduct() { return DatabaseProduct.ORACLE; }
+            @Override public Optional<Table> readTable(String schema, String table) {
+                return Optional.of(holder.table());
+            }
+        };
+        ArtifactGenerationService comparisonService = new ArtifactGenerationService(
+                new DocxSpecificationParser(),
+                new CanonicalSchemaCompareExcelWriter(),
+                ddlEngine(),
+                new DatabaseMetadataReaderRegistry(List.of(lookup)),
+                null,
+                new ZipArtifactPackager(),
+                clock);
+
+        GeneratedZip result = comparisonService.generateFromWord(
+                "customer.docx", new ByteArrayInputStream(docx("CUSTOMER")));
+
+        Map<String, byte[]> entries = unzip(result.content());
+        assertThat(entries).containsOnlyKeys("CUSTOMER_compare_20260720_103025.xlsx");
+        assertThat(entries.values().iterator().next()).isNotEmpty();
+    }
+
+    private DatabaseSchemaHolder databaseTable(String tableName) throws Exception {
+        var schema = new DocxSpecificationParser().parse(new com.behsazan.schemaforge.specification.spi.SpecificationSource(
+                "database.docx", new ByteArrayInputStream(docx(tableName))));
+        return new DatabaseSchemaHolder(schema.tables().getFirst());
+    }
+
+    private record DatabaseSchemaHolder(Table table) { }
     private byte[] docx(String tableName) throws Exception {
         try (XWPFDocument document = new XWPFDocument();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {

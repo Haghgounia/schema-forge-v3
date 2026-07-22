@@ -228,3 +228,29 @@
 - Persian and English descriptions in DOCX Range cells are ignored while numeric intervals/enumerations are retained.
 - Range values now generate portable CHECK expressions such as `BETWEEN` and `IN`.
 - Added unit tests and an end-to-end fixture for ACCOUNTING_CONFIGURATIONS.
+
+## 2026-07-22 - Conditional SQL / comparison Excel routing
+
+- Added DBMS-neutral `DatabaseTableLookup`.
+- Added Oracle single-table metadata lookup without loading the entire schema.
+- Changed artifact routing:
+  - table absent or database lookup disabled: SQL only;
+  - table present: comparison Excel only.
+- Added canonical table-to-table comparison workbook with the same 22-column layout as the supplied samples.
+- Comparison covers added/removed columns, possible rename, datatype, nullability, default, comments, PK, FK, unique, index membership/order, and check constraints.
+
+## 2026-07-22 - Excel Compare Phase 5.1
+- Replaced the Oracle-selected table lookup with the DBMS-neutral `DatabaseMetadataReader` port.
+- Added `DatabaseMetadataReaderRegistry` keyed by `DatabaseProduct`.
+- Added configuration-based target product resolution from `schemaforge.generation.default-database`.
+- Removed Oracle hard-coding from `ArtifactGenerationService` for both metadata lookup and DDL generation.
+- Added registry unit tests and architecture notes.
+
+## 2026-07-22 - Phase 5.3 Comparison Engine Core
+
+- Added DBMS-independent comparison report model.
+- Added comparison context and ordered rule engine.
+- Added column existence and column definition rules.
+- Added default, identifier and text normalizers.
+- Added focused unit tests.
+- Kept the existing Excel writer and artifact-generation runtime unchanged.

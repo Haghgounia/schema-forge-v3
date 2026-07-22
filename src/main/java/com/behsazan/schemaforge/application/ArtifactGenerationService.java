@@ -1,6 +1,9 @@
 package com.behsazan.schemaforge.application;
 
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
+import com.behsazan.schemaforge.application.database.DatabaseMetadataReader;
+import com.behsazan.schemaforge.application.database.DatabaseMetadataReaderRegistry;
+import com.behsazan.schemaforge.application.database.GenerationDatabaseProductResolver;
 import com.behsazan.schemaforge.domain.model.Table;
 import com.behsazan.schemaforge.generation.artifact.ArtifactBundle;
 import com.behsazan.schemaforge.dialect.DatabaseProduct;
@@ -10,7 +13,7 @@ import com.behsazan.schemaforge.generation.ddl.model.ScriptOptions;
 import com.behsazan.schemaforge.generation.spi.ArtifactType;
 import com.behsazan.schemaforge.generation.spi.GeneratedArtifact;
 import com.behsazan.schemaforge.packaging.ZipArtifactPackager;
-import com.behsazan.schemaforge.reporting.SchemaExcelWriter;
+import com.behsazan.schemaforge.reporting.CanonicalSchemaCompareExcelWriter;
 import com.behsazan.schemaforge.specification.adapter.docx.DocxSpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
 import java.io.ByteArrayInputStream;
@@ -32,13 +35,15 @@ import java.util.zip.ZipInputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-/** Produces Oracle SQL and Excel files and packages all results in one ZIP. */
+/** Produces CREATE SQL for new tables or a comparison Excel for existing tables. */
 @Service
 public final class ArtifactGenerationService {
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final DocxSpecificationParser parser;
-    private final SchemaExcelWriter excelWriter;
+    private final CanonicalSchemaCompareExcelWriter compareExcelWriter;
+    private final DatabaseMetadataReaderRegistry metadataReaders;
+    private final GenerationDatabaseProductResolver databaseProductResolver;
     private final DdlGenerationEngine ddlGenerationEngine;
     private final ZipArtifactPackager packager;
     private final Clock clock;
@@ -46,21 +51,37 @@ public final class ArtifactGenerationService {
     @Autowired
     public ArtifactGenerationService(
             DocxSpecificationParser parser,
-            SchemaExcelWriter excelWriter,
-            DdlGenerationEngine ddlGenerationEngine) {
-        this(parser, excelWriter, ddlGenerationEngine,
-                new ZipArtifactPackager(), Clock.systemDefaultZone());
+            CanonicalSchemaCompareExcelWriter compareExcelWriter,
+            DdlGenerationEngine ddlGenerationEngine,
+            DatabaseMetadataReaderRegistry metadataReaders,
+            GenerationDatabaseProductResolver databaseProductResolver) {
+        this(parser, compareExcelWriter, ddlGenerationEngine, metadataReaders,
+                databaseProductResolver, new ZipArtifactPackager(), Clock.systemDefaultZone());
     }
 
     ArtifactGenerationService(
             DocxSpecificationParser parser,
-            SchemaExcelWriter excelWriter,
             DdlGenerationEngine ddlGenerationEngine,
             ZipArtifactPackager packager,
             Clock clock) {
+        this(parser, new CanonicalSchemaCompareExcelWriter(), ddlGenerationEngine,
+                new DatabaseMetadataReaderRegistry(List.of()), null, packager, clock);
+    }
+
+    ArtifactGenerationService(
+            DocxSpecificationParser parser,
+            CanonicalSchemaCompareExcelWriter compareExcelWriter,
+            DdlGenerationEngine ddlGenerationEngine,
+            DatabaseMetadataReaderRegistry metadataReaders,
+            GenerationDatabaseProductResolver databaseProductResolver,
+            ZipArtifactPackager packager,
+            Clock clock) {
         this.parser = parser;
-        this.excelWriter = excelWriter;
+        this.compareExcelWriter = compareExcelWriter;
         this.ddlGenerationEngine = ddlGenerationEngine;
+        this.metadataReaders = metadataReaders == null
+                ? new DatabaseMetadataReaderRegistry(List.of()) : metadataReaders;
+        this.databaseProductResolver = databaseProductResolver;
         this.packager = packager;
         this.clock = clock;
     }
@@ -115,17 +136,37 @@ public final class ArtifactGenerationService {
     }
 
     private List<GeneratedArtifact> artifacts(DatabaseSchema schema, String baseName) {
+        Table documentTable = schema.tables().getFirst();
+        DatabaseProduct targetProduct = resolveTargetProduct();
+        DatabaseMetadataReader reader = metadataReaders.find(targetProduct).orElse(null);
+
+        if (reader != null) {
+            var databaseTable = reader.readTable(
+                    documentTable.qualifiedName().schema().value(),
+                    documentTable.qualifiedName().name().value());
+            if (databaseTable.isPresent()) {
+                byte[] excel = compareExcelWriter.write(
+                        documentTable, databaseTable.get(), reader.columnUsageCounts());
+                String compareName = safeName(documentTable.qualifiedName().name().value())
+                        + "_compare_" + timestampForComparison() + ".xlsx";
+                return List.of(new GeneratedArtifact(
+                        compareName, ArtifactType.EXCEL, excel, 100,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            }
+        }
+
         var ddlResult = ddlGenerationEngine.generate(DdlGenerationRequest.of(
-                schema, DatabaseProduct.ORACLE, ScriptOptions.defaults(), clock));
+                schema, targetProduct, ScriptOptions.defaults(), clock));
         if (ddlResult.renderedDdl().isEmpty()) {
-            throw new IllegalStateException("Oracle SQL generation produced an empty script for " + baseName);
+            throw new IllegalStateException(targetProduct + " SQL generation produced an empty script for " + baseName);
         }
         byte[] sql = ddlResult.ddl().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        byte[] excel = excelWriter.write(schema);
-        return List.of(
-                new GeneratedArtifact(baseName + ".sql", ArtifactType.SQL, sql, 100, "application/sql; charset=UTF-8"),
-                new GeneratedArtifact(baseName + ".xlsx", ArtifactType.EXCEL, excel, 200,
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        return List.of(new GeneratedArtifact(
+                baseName + ".sql", ArtifactType.SQL, sql, 100, "application/sql; charset=UTF-8"));
+    }
+
+    private DatabaseProduct resolveTargetProduct() {
+        return databaseProductResolver == null ? DatabaseProduct.ORACLE : databaseProductResolver.resolve();
     }
 
     private Table requireSingleTable(DatabaseSchema schema, String sourceName) {
@@ -145,6 +186,12 @@ public final class ArtifactGenerationService {
     private String timestamp() {
         ZoneId zone = clock.getZone();
         return LocalDateTime.ofInstant(clock.instant(), zone).format(TIMESTAMP);
+    }
+
+    private String timestampForComparison() {
+        ZoneId zone = clock.getZone();
+        return LocalDateTime.ofInstant(clock.instant(), zone)
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     }
 
     private String safeName(String value) {

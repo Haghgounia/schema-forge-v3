@@ -33,7 +33,7 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
     private static final String COLUMNS_SQL = """
             SELECT c.COLUMN_ID, c.COLUMN_NAME, c.DATA_TYPE, c.DATA_LENGTH, c.CHAR_LENGTH,
                    c.CHAR_USED, c.DATA_PRECISION, c.DATA_SCALE, c.NULLABLE, c.DATA_DEFAULT,
-                   cc.COMMENTS
+                   cc.COMMENTS, c.IDENTITY_COLUMN
               FROM ALL_TAB_COLUMNS c
               LEFT JOIN ALL_COL_COMMENTS cc
                 ON cc.OWNER = c.OWNER AND cc.TABLE_NAME = c.TABLE_NAME AND cc.COLUMN_NAME = c.COLUMN_NAME
@@ -44,7 +44,7 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
             SELECT c.CONSTRAINT_NAME, c.CONSTRAINT_TYPE, cc.COLUMN_NAME,
                    cc.POSITION AS COLUMN_POSITION, c.SEARCH_CONDITION_VC AS EXPRESSION,
                    rc.OWNER AS REFERENCED_OWNER, rc.TABLE_NAME AS REFERENCED_TABLE,
-                   rcc.COLUMN_NAME AS REFERENCED_COLUMN
+                   rcc.COLUMN_NAME AS REFERENCED_COLUMN, c.DELETE_RULE
               FROM ALL_CONSTRAINTS c
               LEFT JOIN ALL_CONS_COLUMNS cc
                 ON cc.OWNER = c.OWNER AND cc.CONSTRAINT_NAME = c.CONSTRAINT_NAME AND cc.TABLE_NAME = c.TABLE_NAME
@@ -180,7 +180,8 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
                 nullableInteger(rs, "DATA_LENGTH"), nullableInteger(rs, "CHAR_LENGTH"), rs.getString("CHAR_USED"),
                 nullableInteger(rs, "DATA_PRECISION"), nullableInteger(rs, "DATA_SCALE"),
                 "Y".equalsIgnoreCase(rs.getString("NULLABLE")), trimToNull(rs.getString("DATA_DEFAULT")),
-                trimToNull(rs.getString("COMMENTS"))));
+                trimToNull(rs.getString("COMMENTS")),
+                "YES".equalsIgnoreCase(rs.getString("IDENTITY_COLUMN"))));
     }
 
     @Override
@@ -188,7 +189,8 @@ public class JdbcOracleMetadataRepository implements OracleMetadataRepository {
         return jdbcTemplate.query(CONSTRAINTS_SQL, parameters(owner, tableName), (rs, rowNum) -> new ConstraintState(
                 rs.getString("CONSTRAINT_NAME"), rs.getString("CONSTRAINT_TYPE"), rs.getString("COLUMN_NAME"),
                 nullableInteger(rs, "COLUMN_POSITION"), trimToNull(rs.getString("EXPRESSION")),
-                rs.getString("REFERENCED_OWNER"), rs.getString("REFERENCED_TABLE"), rs.getString("REFERENCED_COLUMN")));
+                rs.getString("REFERENCED_OWNER"), rs.getString("REFERENCED_TABLE"), rs.getString("REFERENCED_COLUMN"),
+                rs.getString("DELETE_RULE")));
     }
 
     @Override

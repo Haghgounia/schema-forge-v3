@@ -8,5 +8,6 @@ public record ConstraintState(
         String expression,
         String referencedOwner,
         String referencedTable,
-        String referencedColumn) {
+        String referencedColumn,
+        String deleteRule) {
 }

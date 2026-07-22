@@ -56,7 +56,7 @@ public final class OracleCanonicalSchemaMapper {
                 state.nullable(),
                 new DefaultValue(state.defaultValue()),
                 new Description(state.comment()),
-                false,
+                state.identity(),
                 state.columnId());
     }
 
@@ -122,13 +122,22 @@ public final class OracleCanonicalSchemaMapper {
                                 columns,
                                 QualifiedName.of(first.referencedOwner(), first.referencedTable()),
                                 referencedColumns,
-                                ReferentialAction.NO_ACTION,
+                                mapDeleteRule(first.deleteRule()),
                                 ReferentialAction.NO_ACTION));
                     }
                 }
                 default -> { }
             }
         }
+    }
+
+    private ReferentialAction mapDeleteRule(String deleteRule) {
+        if (deleteRule == null || deleteRule.isBlank()) return ReferentialAction.NO_ACTION;
+        return switch (deleteRule.trim().toUpperCase(Locale.ROOT)) {
+            case "CASCADE" -> ReferentialAction.CASCADE;
+            case "SET NULL" -> ReferentialAction.SET_NULL;
+            default -> ReferentialAction.NO_ACTION;
+        };
     }
 
     private Map<String, List<ConstraintState>> groupConstraints(List<ConstraintState> states) {

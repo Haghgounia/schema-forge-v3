@@ -18,11 +18,11 @@ class OracleCanonicalSchemaMapperTest {
         Table table = mapper.mapTable(
                 "BIM", "PROVINCES", "Province reference table",
                 List.of(
-                        new ColumnState(1, "ID", "NUMBER", 22, null, null, 18, 0, false, null, "Identifier"),
-                        new ColumnState(2, "TITLE", "VARCHAR2", 100, 100, "C", null, null, false, null, "Title")),
+                        new ColumnState(1, "ID", "NUMBER", 22, null, null, 18, 0, false, null, "Identifier", false),
+                        new ColumnState(2, "TITLE", "VARCHAR2", 100, 100, "C", null, null, false, null, "Title", false)),
                 List.of(
-                        new ConstraintState("PK_PROVINCES", "P", "ID", 1, null, null, null, null),
-                        new ConstraintState("UK_PROVINCES_TITLE", "U", "TITLE", 1, null, null, null, null)),
+                        new ConstraintState("PK_PROVINCES", "P", "ID", 1, null, null, null, null, null),
+                        new ConstraintState("UK_PROVINCES_TITLE", "U", "TITLE", 1, null, null, null, null, null)),
                 List.of(new IndexState("IX_PROVINCES_TITLE", false, "TITLE", 1, "ASC")));
 
         assertThat(table.qualifiedName().toString()).isEqualTo("BIM.PROVINCES");
