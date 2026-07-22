@@ -1,2 +1,7 @@
-/** Extension point reserved by the SchemaForge v3 architecture baseline. */
+/**
+ * Optional spelling validation adapters.
+ *
+ * <p>LanguageTool is used only to report warnings. Source identifiers are never changed
+ * automatically.</p>
+ */
 package com.behsazan.schemaforge.validation.spelling;

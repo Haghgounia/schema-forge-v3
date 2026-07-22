@@ -195,14 +195,22 @@
 - Existing audit columns are preserved and are not duplicated.
 - Standardized generated script names on Gregorian `yyyyMMdd-HHmmss` with 24-hour `HH`.
 
-## 2026-07-21 - Phase 3.6 Robust Parser & Recovery Engine
+## Phase 3.6 - Robust Parser & Recovery Engine (start)
 
-- Added `DataTypeNormalizer` for common malformed DOCX datatype values.
-- Added `IdentifierSanitizer` for recoverable table, schema, column and constraint names.
-- Added recovery warnings to generated schema metadata:
-  - `recovery.warningCount`
-  - `recovery.warnings`
-- Added conservative recovery for duplicated datatypes, missing parentheses, dot-as-scale separators,
-  attached precision/scale, `TIME_STAMP`, textual notes in datatype cells, and non-positive precision.
-- Added unit tests for datatype and identifier recovery.
-- PostgreSQL identity/sequence bug is intentionally deferred to the next change set.
+### Test isolation fix
+- Database metadata integrations now require both `enabled=true` and a non-blank JDBC URL.
+- Batch DOCX DDL generation can enable Oracle/PostgreSQL output without forcing live database connections.
+- Prevents `schemaforge.oracle.url is required` and PostgreSQL equivalent during offline DDL regression tests.
+
+### Next implementation increment
+- Datatype normalization and identifier recovery will be added after the batch regression test is unblocked.
+
+## Phase 3.6 - LanguageTool spelling validation restoration
+
+- Restored the Phase 2 LanguageTool integration in the V3 validation architecture.
+- Added fail-open HTTP integration with connect/request timeouts.
+- Added bounded replacement suggestions and technical-term filtering.
+- Added a 24-hour in-memory result cache to avoid repeated public API calls.
+- Added `ColumnNameSpellingRule`; findings are warnings and never modify generated identifiers.
+- Spell checking remains disabled by default and can be enabled with
+  `SCHEMAFORGE_SPELL_CHECK_ENABLED=true`.

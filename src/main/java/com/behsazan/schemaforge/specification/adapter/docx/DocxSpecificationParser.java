@@ -20,9 +20,6 @@ import com.behsazan.schemaforge.domain.valueobject.Identifier;
 import com.behsazan.schemaforge.domain.valueobject.QualifiedName;
 import com.behsazan.schemaforge.specification.spi.SpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
-import com.behsazan.schemaforge.specification.recovery.DataTypeNormalizer;
-import com.behsazan.schemaforge.specification.recovery.IdentifierSanitizer;
-import com.behsazan.schemaforge.specification.recovery.RecoveryResult;
 import com.behsazan.schemaforge.validation.oracle.OracleIdentifierValidator;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
@@ -46,9 +43,6 @@ import java.util.regex.Pattern;
 @Component
 public final class DocxSpecificationParser implements SpecificationParser {
     private final OracleIdentifierValidator identifierValidator = new OracleIdentifierValidator();
-    private final DataTypeNormalizer dataTypeNormalizer = new DataTypeNormalizer();
-    private final IdentifierSanitizer identifierSanitizer = new IdentifierSanitizer();
-    private final ThreadLocal<List<String>> recoveryWarnings = ThreadLocal.withInitial(ArrayList::new);
     private static final Pattern DATA_TYPE = Pattern.compile(
             "(?i)^([A-Z][A-Z0-9_ ]*?)(?:\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?(?:\\s+(?:CHAR|BYTE))?\\s*\\))?$");
     private static final Pattern GROUP_REFERENCE = Pattern.compile("(?i)^([A-Z][A-Z0-9_$.]*)(?:/([YN]))?$" );
@@ -62,7 +56,6 @@ public final class DocxSpecificationParser implements SpecificationParser {
     @Override
     public DatabaseSchema parse(SpecificationSource source) {
         Objects.requireNonNull(source, "source must not be null");
-        recoveryWarnings.get().clear();
         try (XWPFDocument document = new XWPFDocument(source.content())) {
             Metadata metadata = readMetadata(document);
             List<ParsedColumn> parsedColumns = readColumns(document);
@@ -70,14 +63,12 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 throw new IllegalArgumentException("No column definitions were found in " + source.fileName());
             }
 
-            String schemaName = recoverIdentifier(metadata.schema(), "schema", source.fileName());
-            String tableName = recoverIdentifier(metadata.tableName(), "table", source.fileName());
+            String schemaName = identifierValidator.requireValid(metadata.schema(), "schema", source.fileName());
+            String tableName = identifierValidator.requireValid(metadata.tableName(), "table", source.fileName());
             Table table = buildTable(schemaName, tableName, metadata.description(), parsedColumns);
 
             DatabaseSchema.Builder schema = DatabaseSchema.builder(schemaName)
                     .metadata("source.fileName", source.fileName())
-                    .metadata("recovery.warningCount", Integer.toString(recoveryWarnings.get().size()))
-                    .metadata("recovery.warnings", String.join(" | ", recoveryWarnings.get()))
                     .addTable(table);
 
             if (parsedColumns.stream().anyMatch(ParsedColumn::identity)) {
@@ -106,7 +97,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
             ParsedColumn parsed = parsedColumns.get(index);
             String defaultExpression = parsed.identity() ? sequenceExpression : emptyToNull(parsed.defaultValue());
             table.addColumn(new Column(
-                    toRecoveredIdentifier(parsed.name(), "column"),
+                    identifierValidator.toIdentifier(parsed.name(), "column"),
                     parsed.dataType(),
                     !parsed.required(),
                     new DefaultValue(defaultExpression),
@@ -121,7 +112,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 .toList();
         if (!primaryKeyColumns.isEmpty()) {
             table.primaryKey(new PrimaryKey(
-                    toRecoveredIdentifier("PK_" + tableName, "primary key"),
+                    identifierValidator.toIdentifier("PK_" + tableName, "primary key"),
                     identifiers(primaryKeyColumns)));
         }
 
@@ -135,16 +126,16 @@ public final class DocxSpecificationParser implements SpecificationParser {
     private void addUniqueKeys(Table.Builder table, String tableName, List<ParsedColumn> columns) {
         Map<String, List<PositionedColumn>> groups = groupColumns(columns, ParsedColumn::uniqueToken);
         groups.forEach((group, members) -> table.addUniqueKey(new UniqueKey(
-                toRecoveredIdentifier(normalizeObjectName("UK", tableName, group), "unique key"),
+                identifierValidator.toIdentifier(normalizeObjectName("UK", tableName, group), "unique key"),
                 identifiers(sortedNames(members)))));
     }
 
     private void addIndexes(Table.Builder table, String tableName, List<ParsedColumn> columns) {
         Map<String, List<PositionedColumn>> groups = groupColumns(columns, ParsedColumn::indexToken);
         groups.forEach((group, members) -> table.addIndex(new Index(
-                toRecoveredIdentifier(normalizeObjectName("IX", tableName, group), "index"),
+                identifierValidator.toIdentifier(normalizeObjectName("IX", tableName, group), "index"),
                 sortedNames(members).stream()
-                        .map(name -> new IndexColumn(toRecoveredIdentifier(name, "index column"), SortDirection.ASC))
+                        .map(name -> new IndexColumn(identifierValidator.toIdentifier(name, "index column"), SortDirection.ASC))
                         .toList(),
                 IndexType.NORMAL,
                 Description.empty())));
@@ -157,10 +148,10 @@ public final class DocxSpecificationParser implements SpecificationParser {
             }
             Reference reference = parseReference(column.referenceTable());
             table.addForeignKey(new ForeignKey(
-                    toRecoveredIdentifier("FK_" + tableName + "_" + column.name(), "foreign key"),
-                    List.of(toRecoveredIdentifier(column.name(), "foreign key column")),
+                    identifierValidator.toIdentifier("FK_" + tableName + "_" + column.name(), "foreign key"),
+                    List.of(identifierValidator.toIdentifier(column.name(), "foreign key column")),
                     validatedQualifiedName(reference.schema(), reference.table(), "referenced table"),
-                    List.of(toRecoveredIdentifier(column.name(), "referenced column")),
+                    List.of(identifierValidator.toIdentifier(column.name(), "referenced column")),
                     ReferentialAction.NO_ACTION,
                     ReferentialAction.NO_ACTION));
         }
@@ -173,7 +164,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 continue;
             }
             table.addCheck(new CheckConstraint(
-                    toRecoveredIdentifier("CK_" + tableName + "_" + column.name(), "check constraint"),
+                    identifierValidator.toIdentifier("CK_" + tableName + "_" + column.name(), "check constraint"),
                     qualifyCheckExpression(column.name(), expression)));
         }
     }
@@ -269,11 +260,11 @@ public final class DocxSpecificationParser implements SpecificationParser {
         List<ParsedColumn> result = new ArrayList<>();
         for (int rowIndex = 1; rowIndex < table.getNumberOfRows(); rowIndex++) {
             XWPFTableRow row = table.getRow(rowIndex);
-            String rawName = cell(row, headers.get(Header.COLUMN_NAME));
-            if (rawName == null || rawName.isBlank()) {
+            String name = identifierValidator.normalize(cell(row, headers.get(Header.COLUMN_NAME)));
+            if (name == null) {
                 continue;
             }
-            String name = recoverIdentifier(rawName, "column", null);
+            identifierValidator.requireValid(name, "column");
             String rawType = cell(row, headers.get(Header.DATA_TYPE));
             if (rawType == null || rawType.isBlank()) {
                 continue;
@@ -297,9 +288,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
     }
 
     private DataType parseDataType(String rawValue) {
-        RecoveryResult recovery = dataTypeNormalizer.normalize(rawValue);
-        recoveryWarnings.get().addAll(recovery.warnings());
-        String normalized = normalizeText(recovery.value())
+        String normalized = normalizeText(rawValue)
                 .toUpperCase(Locale.ROOT)
                 .replace("IDENTITY", "")
                 .replaceAll("\\s+", " ")
@@ -310,8 +299,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 .trim();
         Matcher matcher = DATA_TYPE.matcher(normalized);
         if (!matcher.matches()) {
-            throw new IllegalArgumentException("Unsupported data type after recovery: " + rawValue
-                    + " -> " + normalized);
+            throw new IllegalArgumentException("Unsupported data type: " + rawValue);
         }
 
         String name = normalizeDataTypeName(matcher.group(1));
@@ -410,27 +398,17 @@ public final class DocxSpecificationParser implements SpecificationParser {
 
 
     private QualifiedName validatedQualifiedName(String schemaName, String objectName, String objectType) {
-        String validatedObjectName = recoverIdentifier(objectName, objectType, null);
+        String validatedObjectName = identifierValidator.requireValid(objectName, objectType);
         if (schemaName == null || schemaName.isBlank()) {
             return QualifiedName.of(null, validatedObjectName);
         }
         return QualifiedName.of(
-                recoverIdentifier(schemaName, "schema", null),
+                identifierValidator.requireValid(schemaName, "schema"),
                 validatedObjectName);
     }
 
     private List<Identifier> identifiers(List<String> names) {
-        return names.stream().map(name -> toRecoveredIdentifier(name, "column")).toList();
-    }
-
-    private String recoverIdentifier(String value, String objectType, String sourceName) {
-        RecoveryResult recovered = identifierSanitizer.sanitize(value, objectType);
-        recoveryWarnings.get().addAll(recovered.warnings());
-        return identifierValidator.requireValid(recovered.value(), objectType, sourceName);
-    }
-
-    private Identifier toRecoveredIdentifier(String value, String objectType) {
-        return Identifier.of(recoverIdentifier(value, objectType, null));
+        return names.stream().map(name -> identifierValidator.toIdentifier(name, "column")).toList();
     }
 
     private String firstNonBlank(String first, String second) {

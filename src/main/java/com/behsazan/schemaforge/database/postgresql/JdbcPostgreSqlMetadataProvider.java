@@ -19,12 +19,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @ConditionalOnProperty(prefix = "schemaforge.postgresql", name = "enabled", havingValue = "true")
+@ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText(\'${schemaforge.postgresql.url:}\')")
 public class JdbcPostgreSqlMetadataProvider implements PostgreSqlMetadataProvider {
 
     private static final String SCHEMA_EXISTS_SQL = """

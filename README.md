@@ -145,9 +145,3 @@ build. Secrets and machine-specific paths can be overridden with environment
 variables such as `SCHEMAFORGE_DDL_INPUT_DIRECTORY` and
 `SCHEMAFORGE_DDL_OUTPUT_DIRECTORY`.
 
-
-## Robust DOCX recovery (Phase 3.6)
-
-The DOCX parser now repairs common datatype and identifier defects before building the canonical schema.
-Corrections are retained as schema recovery warnings rather than being silently ignored. See
-`docs/architecture/PHASE-3.6-ROBUST-PARSER.md`.

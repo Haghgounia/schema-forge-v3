@@ -44,6 +44,25 @@ schemaforge:
   web:
     allowed-origin: ${SCHEMAFORGE_UI_ORIGIN:http://localhost:5173}
 
+  spell-check:
+    enabled: ${SCHEMAFORGE_SPELL_CHECK_ENABLED:false}
+    endpoint: ${SCHEMAFORGE_SPELL_CHECK_ENDPOINT:https://api.languagetool.org/v2/check}
+    language: ${SCHEMAFORGE_SPELL_CHECK_LANGUAGE:en-US}
+    connect-timeout: ${SCHEMAFORGE_SPELL_CHECK_CONNECT_TIMEOUT:3s}
+    request-timeout: ${SCHEMAFORGE_SPELL_CHECK_REQUEST_TIMEOUT:5s}
+    maximum-suggestions: ${SCHEMAFORGE_SPELL_CHECK_MAXIMUM_SUGGESTIONS:3}
+    fail-open: ${SCHEMAFORGE_SPELL_CHECK_FAIL_OPEN:true}
+    cache-ttl: ${SCHEMAFORGE_SPELL_CHECK_CACHE_TTL:24h}
+    technical-terms:
+      - ID
+      - UUID
+      - IBAN
+      - SWIFT
+      - CIF
+      - GL
+      - FK
+      - PK
+
   oracle:
     enabled: ${SCHEMAFORGE_ORACLE_ENABLED:true}
     url: ${SCHEMAFORGE_ORACLE_URL:}
