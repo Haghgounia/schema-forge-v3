@@ -246,11 +246,22 @@
 - Removed Oracle hard-coding from `ArtifactGenerationService` for both metadata lookup and DDL generation.
 - Added registry unit tests and architecture notes.
 
-## 2026-07-22 - Phase 5.3 Comparison Engine Core
+## 2026-07-22 - Table Comparison Excel integration
 
-- Added DBMS-independent comparison report model.
-- Added comparison context and ordered rule engine.
-- Added column existence and column definition rules.
-- Added default, identifier and text normalizers.
-- Added focused unit tests.
-- Kept the existing Excel writer and artifact-generation runtime unchanged.
+- Made `SchemaComparisonEngine` the single source of truth for the canonical table comparison workbook.
+- Added `TABLE_SUMMARY`, table-detail, and `DIFFERENCES` sheets.
+- Added atomic difference rows with scope, property, expected/actual values, severity, resolution strategy, and message.
+- Preserved the existing side-by-side document/database column view and column usage counts.
+- Kept possible-column-rename presentation in the detail sheet while structural differences come from the comparison engine.
+- Added a regression test for the three-sheet workbook structure.
+- Confirmed Oracle canonical `VARCHAR` rendering is mapped to `VARCHAR2` by `OracleDdlGenerationPolicy` and covered by `OracleDialectPolicyTest`.
+
+## 2026-07-22 - Sprint 1 Table Comparison Excel UX
+
+- Added professional TABLE_SUMMARY dashboard title and severity legend.
+- Added stable CMP difference codes to the DIFFERENCES sheet.
+- Added rule-based recommendations without changing comparison-engine APIs.
+- Added severity-based cell coloring for Critical, High, Medium, Low, and Info.
+- Added document hyperlinks from summary to table details and differences.
+- Retained filters, freeze panes, automatic column sizing, and atomic difference rows.
+- Expanded Excel writer tests for codes, recommendations, hyperlinks, and filters.

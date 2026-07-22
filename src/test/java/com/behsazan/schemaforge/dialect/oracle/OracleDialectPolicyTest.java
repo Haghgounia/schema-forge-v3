@@ -2,6 +2,7 @@ package com.behsazan.schemaforge.dialect.oracle;
 
 import com.behsazan.schemaforge.dialect.DatabaseCapability;
 import com.behsazan.schemaforge.dialect.LogicalDataType;
+import com.behsazan.schemaforge.domain.valueobject.DataType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,6 +26,12 @@ class OracleDialectPolicyTest {
         assertFalse(dialect.identifierPolicy().isValidUnquoted("1CUSTOMER"));
         assertEquals("\"Customer\"", dialect.identifierPolicy().quote("Customer"));
         assertTrue(dialect.reservedWordProvider().isReserved("select"));
+    }
+
+    @Test
+    void rendersCanonicalVarcharAsOracleVarchar2() {
+        assertEquals("VARCHAR2(100)", dialect.ddlGenerationPolicy()
+                .renderDataType(DataType.varchar("VARCHAR", 100), dialect));
     }
 
     @Test

@@ -1,5 +1,33 @@
 package com.behsazan.schemaforge.reporting;
 
+import com.behsazan.schemaforge.comparison.column.ColumnComparisonRule;
+import com.behsazan.schemaforge.comparison.column.CommentComparisonRule;
+import com.behsazan.schemaforge.comparison.column.DataTypeNameComparisonRule;
+import com.behsazan.schemaforge.comparison.column.DefaultComparisonRule;
+import com.behsazan.schemaforge.comparison.column.IdentityComparisonRule;
+import com.behsazan.schemaforge.comparison.column.LengthComparisonRule;
+import com.behsazan.schemaforge.comparison.column.NullableComparisonRule;
+import com.behsazan.schemaforge.comparison.column.PrecisionComparisonRule;
+import com.behsazan.schemaforge.comparison.column.ScaleComparisonRule;
+import com.behsazan.schemaforge.comparison.context.ComparisonContextFactory;
+import com.behsazan.schemaforge.comparison.engine.SchemaComparisonEngine;
+import com.behsazan.schemaforge.comparison.model.ComparisonDifference;
+import com.behsazan.schemaforge.comparison.model.DifferenceScope;
+import com.behsazan.schemaforge.comparison.model.DifferenceSeverity;
+import com.behsazan.schemaforge.comparison.model.DifferenceType;
+import com.behsazan.schemaforge.comparison.model.TableComparisonReport;
+import com.behsazan.schemaforge.comparison.rule.ColumnDefinitionComparisonRule;
+import com.behsazan.schemaforge.comparison.rule.ColumnExistenceComparisonRule;
+import com.behsazan.schemaforge.comparison.rule.constraint.CheckConstraintComparisonRule;
+import com.behsazan.schemaforge.comparison.rule.constraint.ForeignKeyComparisonRule;
+import com.behsazan.schemaforge.comparison.rule.constraint.PrimaryKeyComparisonRule;
+import com.behsazan.schemaforge.comparison.rule.constraint.UniqueKeyComparisonRule;
+import com.behsazan.schemaforge.comparison.rule.index.IndexComparisonRule;
+import com.behsazan.schemaforge.comparison.signature.CheckConstraintSignatureFactory;
+import com.behsazan.schemaforge.comparison.signature.ForeignKeySignatureFactory;
+import com.behsazan.schemaforge.comparison.signature.IndexSignatureFactory;
+import com.behsazan.schemaforge.comparison.signature.PrimaryKeySignatureFactory;
+import com.behsazan.schemaforge.comparison.signature.UniqueKeySignatureFactory;
 import com.behsazan.schemaforge.domain.model.CheckConstraint;
 import com.behsazan.schemaforge.domain.model.Column;
 import com.behsazan.schemaforge.domain.model.ForeignKey;
@@ -12,7 +40,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,6 +53,7 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
@@ -33,43 +61,54 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-/** Creates the document-versus-live-database comparison workbook from canonical tables. */
+/** Creates a table-focused comparison workbook from canonical document and database tables. */
 @Component
 public final class CanonicalSchemaCompareExcelWriter {
-    private static final String[] HEADERS = {
-            "COLUMN_USAGE", "COLUMN_ID", "COLUMN_NAME", "COMMENTS",
-            "DATA_TYPE", "PRIMARY/FOREIGN KEY", "UNIQUE", "INDEX", "REQUIRED",
-            "DEFAULT", "RANGE", "COLUMN_ID", "COLUMN_NAME", "DATA_TYPE",
-            "NULLABLE", "DATA_DEFAULT", "COMMENTS", "INDEX", "UNIQUE_INDEX",
-            "FOREIGN KEY", "CHECK CONSTRAINT", "DIFF"
+    private static final String[] DETAIL_HEADERS = {
+            "COLUMN_USAGE", "DOC_COLUMN_ID", "DOC_COLUMN_NAME", "DOC_COMMENTS",
+            "DOC_DATA_TYPE", "DOC_KEY", "DOC_UNIQUE", "DOC_INDEX", "DOC_REQUIRED",
+            "DOC_DEFAULT", "DOC_RANGE", "DB_COLUMN_ID", "DB_COLUMN_NAME", "DB_DATA_TYPE",
+            "DB_NULLABLE", "DB_DEFAULT", "DB_COMMENTS", "DB_INDEX", "DB_UNIQUE",
+            "DB_FOREIGN_KEY", "DB_CHECK_CONSTRAINT", "DIFF"
     };
+    private static final String[] DIFFERENCE_HEADERS = {
+            "CODE", "SCHEMA", "TABLE", "SCOPE", "OBJECT", "PROPERTY", "DIFFERENCE_TYPE",
+            "EXPECTED_VALUE", "ACTUAL_VALUE", "SEVERITY", "RECOMMENDATION", "RESOLUTION", "MESSAGE"
+    };
+
+    private final SchemaComparisonEngine comparisonEngine;
+
+    public CanonicalSchemaCompareExcelWriter() {
+        this(defaultEngine());
+    }
+
+    @Autowired
+    public CanonicalSchemaCompareExcelWriter(SchemaComparisonEngine comparisonEngine) {
+        this.comparisonEngine = Objects.requireNonNull(comparisonEngine, "comparisonEngine must not be null");
+    }
 
     public byte[] write(Table documentTable, Table databaseTable, Map<String, Integer> usageCounts) {
         Objects.requireNonNull(documentTable, "documentTable must not be null");
         Objects.requireNonNull(databaseTable, "databaseTable must not be null");
         Map<String, Integer> safeUsageCounts = usageCounts == null ? Map.of() : Map.copyOf(usageCounts);
+        TableComparisonReport report = comparisonEngine.compare(documentTable, databaseTable);
 
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet(safeSheetName(documentTable.qualifiedName().name().value()));
             CellStyle header = headerStyle(workbook);
             CellStyle normal = baseStyle(workbook);
             CellStyle diff = diffStyle(workbook);
-            writeHeader(sheet, header);
+            Map<DifferenceSeverity, CellStyle> severityStyles = severityStyles(workbook);
 
-            List<ColumnPair> pairs = pairColumns(documentTable, databaseTable);
-            int rowNumber = 1;
-            for (ColumnPair pair : pairs) {
-                Row row = sheet.createRow(rowNumber++);
-                writeDocument(row, documentTable, pair.document(), usage(safeUsageCounts, pair.document()), normal);
-                writeDatabase(row, databaseTable, pair.database(), normal);
-                List<String> differences = compare(documentTable, pair.document(), databaseTable, pair.database(), pair.renameCandidate());
-                setCell(row, 21, String.join(",", differences), differences.isEmpty() ? normal : diff);
-            }
+            String detailSheetName = safeSheetName(documentTable.qualifiedName().name().value());
+            writeSummarySheet(workbook, documentTable, databaseTable, report, detailSheetName, header, normal, severityStyles);
+            writeDetailSheet(workbook, documentTable, databaseTable, safeUsageCounts, report, detailSheetName, header, normal, diff);
+            writeDifferencesSheet(workbook, report, detailSheetName, header, normal, severityStyles);
 
-            configure(sheet, pairs.size());
+            workbook.setActiveSheet(0);
             workbook.write(output);
             return output.toByteArray();
         } catch (IOException exception) {
@@ -77,37 +116,190 @@ public final class CanonicalSchemaCompareExcelWriter {
         }
     }
 
+    private void writeSummarySheet(
+            XSSFWorkbook workbook,
+            Table documentTable,
+            Table databaseTable,
+            TableComparisonReport report,
+            String detailSheetName,
+            CellStyle header,
+            CellStyle normal,
+            Map<DifferenceSeverity, CellStyle> severityStyles) {
+        Sheet sheet = workbook.createSheet("TABLE_SUMMARY");
+
+        Row title = sheet.createRow(0);
+        title.setHeightInPoints(30);
+        setCell(title, 0, "SchemaForge Table Comparison Report", titleStyle(workbook));
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 2));
+
+        Row headerRow = sheet.createRow(2);
+        setCell(headerRow, 0, "METRIC", header);
+        setCell(headerRow, 1, "VALUE", header);
+        setCell(headerRow, 2, "NAVIGATION", header);
+
+        String[][] rows = {
+                {"SCHEMA", report.schemaName()},
+                {"TABLE", report.tableName()},
+                {"STATUS", report.hasDifferences() ? "DIFFERENT" : "EQUAL"},
+                {"DOCUMENT_COLUMNS", String.valueOf(documentTable.columns().size())},
+                {"DATABASE_COLUMNS", String.valueOf(databaseTable.columns().size())},
+                {"TOTAL_DIFFERENCES", String.valueOf(report.summary().total())},
+                {"CRITICAL", String.valueOf(report.summary().critical())},
+                {"HIGH", String.valueOf(report.summary().high())},
+                {"MEDIUM", String.valueOf(report.summary().medium())},
+                {"LOW", String.valueOf(report.summary().low())},
+                {"INFO", String.valueOf(report.summary().info())}
+        };
+        for (int i = 0; i < rows.length; i++) {
+            Row row = sheet.createRow(i + 3);
+            setCell(row, 0, rows[i][0], normal);
+            CellStyle valueStyle = switch (rows[i][0]) {
+                case "CRITICAL" -> severityStyles.get(DifferenceSeverity.CRITICAL);
+                case "HIGH" -> severityStyles.get(DifferenceSeverity.HIGH);
+                case "MEDIUM" -> severityStyles.get(DifferenceSeverity.MEDIUM);
+                case "LOW" -> severityStyles.get(DifferenceSeverity.LOW);
+                case "INFO" -> severityStyles.get(DifferenceSeverity.INFO);
+                default -> normal;
+            };
+            setCell(row, 1, rows[i][1], valueStyle);
+        }
+
+        setDocumentLink(workbook, sheet.getRow(4).createCell(2), detailSheetName, "Open table details", normal);
+        setDocumentLink(workbook, sheet.getRow(8).createCell(2), "DIFFERENCES", "Open all differences", normal);
+
+        int legendStart = 16;
+        Row legendTitle = sheet.createRow(legendStart);
+        setCell(legendTitle, 0, "SEVERITY LEGEND", header);
+        setCell(legendTitle, 1, "MEANING", header);
+        String[][] legend = {
+                {"CRITICAL", "Structural integrity or key definition risk"},
+                {"HIGH", "Data compatibility or behavior risk"},
+                {"MEDIUM", "Definition mismatch requiring review"},
+                {"LOW", "Documentation or descriptive mismatch"},
+                {"INFO", "Informational difference"}
+        };
+        for (int i = 0; i < legend.length; i++) {
+            Row row = sheet.createRow(legendStart + 1 + i);
+            DifferenceSeverity severity = DifferenceSeverity.valueOf(legend[i][0]);
+            setCell(row, 0, legend[i][0], severityStyles.get(severity));
+            setCell(row, 1, legend[i][1], normal);
+        }
+
+        sheet.createFreezePane(0, 3);
+        sheet.setAutoFilter(new CellRangeAddress(2, 13, 0, 1));
+        sheet.setColumnWidth(0, 7000);
+        sheet.setColumnWidth(1, 10000);
+        sheet.setColumnWidth(2, 7000);
+    }
+
+    private void writeDetailSheet(
+            XSSFWorkbook workbook,
+            Table documentTable,
+            Table databaseTable,
+            Map<String, Integer> usageCounts,
+            TableComparisonReport report,
+            String detailSheetName,
+            CellStyle header,
+            CellStyle normal,
+            CellStyle diff) {
+        Sheet sheet = workbook.createSheet(detailSheetName);
+        writeHeader(sheet, DETAIL_HEADERS, header);
+        Map<String, List<ComparisonDifference>> columnDifferences = report.differences().stream()
+                .filter(item -> item.scope() == DifferenceScope.COLUMN)
+                .collect(Collectors.groupingBy(
+                        item -> normalize(item.objectName()),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        List<ColumnPair> pairs = pairColumns(documentTable, databaseTable);
+        int rowNumber = 1;
+        for (ColumnPair pair : pairs) {
+            Row row = sheet.createRow(rowNumber++);
+            writeDocument(row, documentTable, pair.document(), usage(usageCounts, pair.document()), normal);
+            writeDatabase(row, databaseTable, pair.database(), normal);
+            List<String> types = differencesForPair(pair, columnDifferences);
+            setCell(row, 21, String.join(",", types), types.isEmpty() ? normal : diff);
+        }
+        configure(sheet, DETAIL_HEADERS.length, pairs.size());
+    }
+
+    private void writeDifferencesSheet(
+            XSSFWorkbook workbook,
+            TableComparisonReport report,
+            String detailSheetName,
+            CellStyle header,
+            CellStyle normal,
+            Map<DifferenceSeverity, CellStyle> severityStyles) {
+        Sheet sheet = workbook.createSheet("DIFFERENCES");
+        writeHeader(sheet, DIFFERENCE_HEADERS, header);
+        int rowNumber = 1;
+        for (ComparisonDifference difference : report.differences()) {
+            Row row = sheet.createRow(rowNumber++);
+            setCell(row, 0, differenceCode(difference.type()), normal);
+            setCell(row, 1, report.schemaName(), normal);
+            setDocumentLink(workbook, row.createCell(2), detailSheetName, report.tableName(), normal);
+            setCell(row, 3, difference.scope().name(), normal);
+            setCell(row, 4, difference.objectName(), normal);
+            setCell(row, 5, difference.property(), normal);
+            setCell(row, 6, difference.type().name(), normal);
+            setCell(row, 7, difference.expectedValue(), normal);
+            setCell(row, 8, difference.actualValue(), normal);
+            setCell(row, 9, difference.severity().name(), severityStyles.get(difference.severity()));
+            setCell(row, 10, recommendation(difference), normal);
+            setCell(row, 11, difference.resolutionStrategy().name(), normal);
+            setCell(row, 12, difference.message(), normal);
+        }
+        configure(sheet, DIFFERENCE_HEADERS.length, report.differences().size());
+        sheet.setColumnWidth(10, 12000);
+        sheet.setColumnWidth(12, 18000);
+    }
+
+    private List<String> differencesForPair(
+            ColumnPair pair,
+            Map<String, List<ComparisonDifference>> differencesByColumn) {
+        Set<String> result = new java.util.LinkedHashSet<>();
+        if (pair.document() != null) {
+            differencesByColumn.getOrDefault(pair.document().name().normalized(), List.of())
+                    .forEach(item -> result.add(item.type().name()));
+        }
+        if (pair.database() != null) {
+            differencesByColumn.getOrDefault(pair.database().name().normalized(), List.of())
+                    .forEach(item -> result.add(item.type().name()));
+        }
+        if (pair.renameCandidate()) result.add("POSSIBLE_COLUMN_RENAME");
+        return List.copyOf(result);
+    }
+
     private List<ColumnPair> pairColumns(Table documentTable, Table databaseTable) {
-        Map<String, Column> doc = byName(documentTable.columns());
-        Map<String, Column> db = byName(databaseTable.columns());
+        Map<String, Column> database = byName(databaseTable.columns());
         List<ColumnPair> result = new ArrayList<>();
-        Set<String> matchedDb = new HashSet<>();
-        List<Column> unmatchedDoc = new ArrayList<>();
+        Set<String> matchedDatabase = new HashSet<>();
+        List<Column> unmatchedDocument = new ArrayList<>();
 
         documentTable.columns().stream().sorted(byPosition()).forEach(column -> {
-            Column exact = db.get(column.name().normalized());
+            Column exact = database.get(column.name().normalized());
             if (exact != null) {
                 result.add(new ColumnPair(column, exact, false));
-                matchedDb.add(exact.name().normalized());
+                matchedDatabase.add(exact.name().normalized());
             } else {
-                unmatchedDoc.add(column);
+                unmatchedDocument.add(column);
             }
         });
 
-        List<Column> unmatchedDb = databaseTable.columns().stream()
-                .filter(column -> !matchedDb.contains(column.name().normalized()))
+        List<Column> unmatchedDatabase = databaseTable.columns().stream()
+                .filter(column -> !matchedDatabase.contains(column.name().normalized()))
                 .sorted(byPosition()).collect(Collectors.toCollection(ArrayList::new));
 
-        for (Column documentColumn : unmatchedDoc) {
-            Column candidate = bestRenameCandidate(documentColumn, unmatchedDb);
+        for (Column documentColumn : unmatchedDocument) {
+            Column candidate = bestRenameCandidate(documentColumn, unmatchedDatabase);
             if (candidate != null) {
                 result.add(new ColumnPair(documentColumn, candidate, true));
-                unmatchedDb.remove(candidate);
+                unmatchedDatabase.remove(candidate);
             } else {
                 result.add(new ColumnPair(documentColumn, null, false));
             }
         }
-        unmatchedDb.forEach(column -> result.add(new ColumnPair(null, column, false)));
+        unmatchedDatabase.forEach(column -> result.add(new ColumnPair(null, column, false)));
         return result;
     }
 
@@ -130,26 +322,6 @@ public final class CanonicalSchemaCompareExcelWriter {
             }
         }
         return bestScore >= 0.60 ? best : null;
-    }
-
-    private List<String> compare(Table docTable, Column doc, Table dbTable, Column db, boolean renameCandidate) {
-        List<String> differences = new ArrayList<>();
-        if (doc == null) return List.of("COLUMN_REMOVED_FROM_DOCUMENT");
-        if (db == null) return List.of("COLUMN_ADDED_IN_DOCUMENT");
-        if (renameCandidate || !doc.name().equals(db.name())) differences.add("POSSIBLE_RENAME");
-        if (!normalize(format(doc)).equals(normalize(format(db)))) differences.add("DATA_TYPE");
-        if (doc.nullable() != db.nullable()) differences.add("NULLABLE");
-        if (doc.identity() != db.identity()) differences.add("IDENTITY");
-        if (!normalizeDefault(doc.defaultValue().expression()).equals(normalizeDefault(db.defaultValue().expression()))) {
-            differences.add("DEFAULT");
-        }
-        if (!normalizeText(doc.description().value()).equals(normalizeText(db.description().value()))) differences.add("COMMENTS");
-        if (inPrimaryKey(docTable, doc.name()) != inPrimaryKey(dbTable, db.name())) differences.add("PRIMARY_KEY");
-        if (inUnique(docTable, doc.name()) != inUnique(dbTable, db.name())) differences.add("UNIQUE");
-        if (!indexSignatures(docTable, doc.name()).equals(indexSignatures(dbTable, db.name()))) differences.add("INDEX");
-        if (!foreignKeySignatures(docTable, doc.name()).equals(foreignKeySignatures(dbTable, db.name()))) differences.add("FOREIGN_KEY");
-        if (!checkExpressions(docTable, doc.name()).equals(checkExpressions(dbTable, db.name()))) differences.add("CHECK_CONSTRAINT");
-        return differences;
     }
 
     private void writeDocument(Row row, Table table, Column column, int usage, CellStyle style) {
@@ -276,8 +448,14 @@ public final class CanonicalSchemaCompareExcelWriter {
         return previous[right.length()];
     }
 
-    private String normalize(String value) { return value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", ""); }
-    private String normalizeText(String value) { return value == null ? "" : value.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT); }
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", "");
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+    }
+
     private String normalizeDefault(String value) {
         String normalized = normalize(value);
         while (normalized.startsWith("(") && normalized.endsWith(")") && normalized.length() > 1) {
@@ -286,18 +464,111 @@ public final class CanonicalSchemaCompareExcelWriter {
         return normalized;
     }
 
-    private void writeHeader(Sheet sheet, CellStyle style) {
-        Row row = sheet.createRow(0);
-        row.setHeightInPoints(32);
-        for (int i = 0; i < HEADERS.length; i++) setCell(row, i, HEADERS[i], style);
+    private String differenceCode(DifferenceType type) {
+        return switch (type) {
+            case TABLE_NOT_FOUND -> "CMP-001";
+            case TABLE_COMMENT_CHANGED -> "CMP-002";
+            case COLUMN_MISSING -> "CMP-101";
+            case COLUMN_EXTRA -> "CMP-102";
+            case POSSIBLE_COLUMN_RENAME -> "CMP-103";
+            case DATA_TYPE_CHANGED -> "CMP-104";
+            case LENGTH_CHANGED -> "CMP-105";
+            case PRECISION_CHANGED -> "CMP-106";
+            case SCALE_CHANGED -> "CMP-107";
+            case NULLABLE_CHANGED -> "CMP-108";
+            case DEFAULT_CHANGED -> "CMP-109";
+            case COMMENT_CHANGED -> "CMP-110";
+            case IDENTITY_CHANGED -> "CMP-111";
+            case PRIMARY_KEY_MISSING -> "CMP-201";
+            case PRIMARY_KEY_EXTRA -> "CMP-202";
+            case PRIMARY_KEY_CHANGED -> "CMP-203";
+            case FOREIGN_KEY_MISSING -> "CMP-211";
+            case FOREIGN_KEY_EXTRA -> "CMP-212";
+            case FOREIGN_KEY_CHANGED -> "CMP-213";
+            case UNIQUE_MISSING -> "CMP-221";
+            case UNIQUE_EXTRA -> "CMP-222";
+            case UNIQUE_CHANGED -> "CMP-223";
+            case CHECK_MISSING -> "CMP-231";
+            case CHECK_EXTRA -> "CMP-232";
+            case CHECK_CHANGED -> "CMP-233";
+            case INDEX_MISSING -> "CMP-301";
+            case INDEX_EXTRA -> "CMP-302";
+            case INDEX_CHANGED -> "CMP-303";
+        };
     }
 
-    private void configure(Sheet sheet, int rows) {
+    private String recommendation(ComparisonDifference difference) {
+        return switch (difference.type()) {
+            case TABLE_NOT_FOUND -> "Create the missing table or verify the selected schema";
+            case TABLE_COMMENT_CHANGED, COMMENT_CHANGED -> "Synchronize the database comment with the document";
+            case COLUMN_MISSING -> "Add the missing database column";
+            case COLUMN_EXTRA -> "Confirm whether the extra database column should be retained or removed";
+            case POSSIBLE_COLUMN_RENAME -> "Review the possible rename before changing either side";
+            case DATA_TYPE_CHANGED -> "Review compatibility, then alter the column data type";
+            case LENGTH_CHANGED, PRECISION_CHANGED, SCALE_CHANGED -> "Review data-loss risk, then alter the column size";
+            case NULLABLE_CHANGED -> "Review existing data, then modify nullability";
+            case DEFAULT_CHANGED -> "Alter or remove the column default";
+            case IDENTITY_CHANGED -> "Review identity or generated-column behavior";
+            case PRIMARY_KEY_MISSING, PRIMARY_KEY_EXTRA, PRIMARY_KEY_CHANGED -> "Reconcile the primary key definition";
+            case FOREIGN_KEY_MISSING, FOREIGN_KEY_EXTRA, FOREIGN_KEY_CHANGED -> "Reconcile the foreign key definition and actions";
+            case UNIQUE_MISSING, UNIQUE_EXTRA, UNIQUE_CHANGED -> "Reconcile the unique constraint definition";
+            case CHECK_MISSING, CHECK_EXTRA, CHECK_CHANGED -> "Reconcile the check constraint expression";
+            case INDEX_MISSING, INDEX_EXTRA, INDEX_CHANGED -> "Review and reconcile the supporting index";
+        };
+    }
+
+    private void setDocumentLink(
+            XSSFWorkbook workbook,
+            Cell cell,
+            String targetSheet,
+            String label,
+            CellStyle style) {
+        cell.setCellValue(label);
+        var hyperlink = workbook.getCreationHelper().createHyperlink(HyperlinkType.DOCUMENT);
+        hyperlink.setAddress("'" + targetSheet.replace("'", "''") + "'!A1");
+        cell.setHyperlink(hyperlink);
+        cell.setCellStyle(style);
+    }
+
+    private Map<DifferenceSeverity, CellStyle> severityStyles(XSSFWorkbook workbook) {
+        Map<DifferenceSeverity, CellStyle> result = new java.util.EnumMap<>(DifferenceSeverity.class);
+        result.put(DifferenceSeverity.CRITICAL, filledStyle(workbook, IndexedColors.RED));
+        result.put(DifferenceSeverity.HIGH, filledStyle(workbook, IndexedColors.ORANGE));
+        result.put(DifferenceSeverity.MEDIUM, filledStyle(workbook, IndexedColors.LIGHT_YELLOW));
+        result.put(DifferenceSeverity.LOW, filledStyle(workbook, IndexedColors.LIGHT_CORNFLOWER_BLUE));
+        result.put(DifferenceSeverity.INFO, filledStyle(workbook, IndexedColors.GREY_25_PERCENT));
+        return result;
+    }
+
+    private CellStyle filledStyle(XSSFWorkbook workbook, IndexedColors color) {
+        CellStyle style = baseStyle(workbook);
+        style.setFillForegroundColor(color.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        return style;
+    }
+
+    private CellStyle titleStyle(XSSFWorkbook workbook) {
+        CellStyle style = baseStyle(workbook);
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 16);
+        style.setFont(font);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        return style;
+    }
+
+    private void writeHeader(Sheet sheet, String[] headers, CellStyle style) {
+        Row row = sheet.createRow(0);
+        row.setHeightInPoints(32);
+        for (int i = 0; i < headers.length; i++) setCell(row, i, headers[i], style);
+    }
+
+    private void configure(Sheet sheet, int columns, int rows) {
         sheet.createFreezePane(0, 1);
-        sheet.setAutoFilter(new CellRangeAddress(0, Math.max(1, rows), 0, HEADERS.length - 1));
-        for (int i = 0; i < HEADERS.length; i++) {
+        sheet.setAutoFilter(new CellRangeAddress(0, Math.max(1, rows), 0, columns - 1));
+        for (int i = 0; i < columns; i++) {
             sheet.autoSizeColumn(i);
-            sheet.setColumnWidth(i, Math.min(sheet.getColumnWidth(i) + 512, 16000));
+            sheet.setColumnWidth(i, Math.min(sheet.getColumnWidth(i) + 512, 18000));
         }
     }
 
@@ -342,9 +613,34 @@ public final class CanonicalSchemaCompareExcelWriter {
     }
 
     private String safeSheetName(String value) {
-        String candidate = value == null || value.isBlank() ? "Comparison" : value.trim();
+        String candidate = value == null || value.isBlank() ? "TABLE_DETAILS" : value.trim();
         candidate = candidate.replaceAll("[\\\\/?*\\[\\]:]", "_");
+        if (candidate.equalsIgnoreCase("TABLE_SUMMARY") || candidate.equalsIgnoreCase("DIFFERENCES")) {
+            candidate = candidate + "_DETAIL";
+        }
         return candidate.substring(0, Math.min(candidate.length(), 31));
+    }
+
+    private static SchemaComparisonEngine defaultEngine() {
+        List<ColumnComparisonRule> columnRules = List.of(
+                new DataTypeNameComparisonRule(),
+                new LengthComparisonRule(),
+                new PrecisionComparisonRule(),
+                new ScaleComparisonRule(),
+                new NullableComparisonRule(),
+                new DefaultComparisonRule(),
+                new IdentityComparisonRule(),
+                new CommentComparisonRule());
+        return new SchemaComparisonEngine(
+                new ComparisonContextFactory(),
+                List.of(
+                        new ColumnExistenceComparisonRule(),
+                        new ColumnDefinitionComparisonRule(columnRules),
+                        new PrimaryKeyComparisonRule(new PrimaryKeySignatureFactory()),
+                        new UniqueKeyComparisonRule(new UniqueKeySignatureFactory()),
+                        new ForeignKeyComparisonRule(new ForeignKeySignatureFactory()),
+                        new CheckConstraintComparisonRule(new CheckConstraintSignatureFactory()),
+                        new IndexComparisonRule(new IndexSignatureFactory())));
     }
 
     private record ColumnPair(Column document, Column database, boolean renameCandidate) { }

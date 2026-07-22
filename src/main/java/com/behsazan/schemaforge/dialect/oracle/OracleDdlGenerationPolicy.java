@@ -63,11 +63,26 @@ public final class OracleDdlGenerationPolicy implements DdlGenerationPolicy {
 
     @Override
     public String renderDataType(DataType dataType, DatabaseDialect dialect) {
-        String baseName = dialect.dataTypeRules().normalize(dataType.name().value());
+        String canonicalName = dialect.dataTypeRules().normalize(dataType.name().value());
+        String baseName = mapCanonicalType(canonicalName);
         if (!dialect.dataTypeRules().supports(baseName)) {
-            throw new TableGenerationException("Unsupported data type for " + dialect.name() + ": " + baseName);
+            throw new TableGenerationException("Unsupported data type for " + dialect.name() + ": " + canonicalName);
         }
         return withSize(baseName, dataType);
+    }
+
+    private static String mapCanonicalType(String name) {
+        return switch (name) {
+            case "VARCHAR", "STRING" -> "VARCHAR2";
+            case "NVARCHAR", "NATIONAL_STRING" -> "NVARCHAR2";
+            case "INTEGER", "INT" -> "NUMBER";
+            case "DECIMAL", "NUMERIC" -> "NUMBER";
+            case "BOOLEAN" -> "NUMBER";
+            case "TEXT", "LARGE_TEXT" -> "CLOB";
+            case "BINARY" -> "RAW";
+            case "LARGE_BINARY" -> "BLOB";
+            default -> name;
+        };
     }
 
     private static String withSize(String baseName, DataType dataType) {
