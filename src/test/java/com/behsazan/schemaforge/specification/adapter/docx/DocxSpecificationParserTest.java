@@ -142,6 +142,42 @@ class DocxSpecificationParserTest {
     }
 
     @Test
+    void parsesVirtualColumnExpressionHeader() throws Exception {
+        byte[] documentBytes;
+        try (XWPFDocument document = new XWPFDocument();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            XWPFTable metadata = document.createTable(2, 2);
+            metadata.getRow(0).getCell(0).setText("TABLE NAME");
+            metadata.getRow(0).getCell(1).setText("SCHEMA NAME");
+            metadata.getRow(1).getCell(0).setText("ACCOUNT_BALANCE");
+            metadata.getRow(1).getCell(1).setText("BANK");
+
+            XWPFTable columns = document.createTable(4, 3);
+            columns.getRow(0).getCell(0).setText("COLUMN NAME");
+            columns.getRow(0).getCell(1).setText("DATA TYPE");
+            columns.getRow(0).getCell(2).setText("VIRTUAL COLUMN EXPRESSION");
+            columns.getRow(1).getCell(0).setText("DEBIT_AMOUNT");
+            columns.getRow(1).getCell(1).setText("NUMBER(18,2)");
+            columns.getRow(2).getCell(0).setText("CREDIT_AMOUNT");
+            columns.getRow(2).getCell(1).setText("NUMBER(18,2)");
+            columns.getRow(3).getCell(0).setText("NET_AMOUNT");
+            columns.getRow(3).getCell(1).setText("NUMBER(18,2)");
+            columns.getRow(3).getCell(2).setText("CREDIT_AMOUNT - DEBIT_AMOUNT");
+
+            document.write(output);
+            documentBytes = output.toByteArray();
+        }
+
+        Table table = parser.parse(new SpecificationSource(
+                "virtual-column.docx",
+                new ByteArrayInputStream(documentBytes))).tables().getFirst();
+
+        var virtualColumn = table.findColumn("NET_AMOUNT").orElseThrow();
+        assertThat(virtualColumn.generated()).isTrue();
+        assertThat(virtualColumn.generatedExpression()).isEqualTo("CREDIT_AMOUNT - DEBIT_AMOUNT");
+    }
+
+    @Test
     void supportsDocxCaseInsensitively() {
         assertThat(parser.supports("TABLE.DOCX")).isTrue();
         assertThat(parser.supports("TABLE.xlsx")).isFalse();

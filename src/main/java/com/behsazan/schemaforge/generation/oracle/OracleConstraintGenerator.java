@@ -1,5 +1,7 @@
 package com.behsazan.schemaforge.generation.oracle;
 
+import com.behsazan.schemaforge.dialect.DatabaseDialect;
+import com.behsazan.schemaforge.dialect.oracle.OracleDialect;
 import com.behsazan.schemaforge.domain.enums.ReferentialAction;
 import com.behsazan.schemaforge.domain.model.CheckConstraint;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
@@ -8,6 +10,7 @@ import com.behsazan.schemaforge.domain.model.PrimaryKey;
 import com.behsazan.schemaforge.domain.model.Table;
 import com.behsazan.schemaforge.domain.model.UniqueKey;
 import com.behsazan.schemaforge.domain.valueobject.Identifier;
+import com.behsazan.schemaforge.generation.ddl.generator.constraint.ConstraintSqlSupport;
 import com.behsazan.schemaforge.generation.model.SqlSection;
 import com.behsazan.schemaforge.generation.model.SqlStatement;
 
@@ -25,6 +28,9 @@ import java.util.stream.Collectors;
  */
 @Deprecated(forRemoval = true, since = "3.3")
 public final class OracleConstraintGenerator {
+    private final ConstraintSqlSupport sql = new ConstraintSqlSupport();
+    private final DatabaseDialect dialect = new OracleDialect();
+
 
     public List<SqlSection> generate(DatabaseSchema schema) {
         List<SqlStatement> localConstraints = new ArrayList<>();
@@ -112,7 +118,9 @@ public final class OracleConstraintGenerator {
                 + primaryKey.name()
                 + " PRIMARY KEY ("
                 + columns(primaryKey.columns())
-                + ");";
+                + ")"
+                + sql.oracleUsingIndex(table, primaryKey.name(), primaryKey.columns(), dialect)
+                + ";";
     }
 
     private String buildUniqueKey(
@@ -125,7 +133,9 @@ public final class OracleConstraintGenerator {
                 + uniqueKey.name()
                 + " UNIQUE ("
                 + columns(uniqueKey.columns())
-                + ");";
+                + ")"
+                + sql.oracleUsingIndex(table, uniqueKey.name(), uniqueKey.columns(), dialect)
+                + ";";
     }
 
     private String buildCheck(

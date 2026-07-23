@@ -30,7 +30,8 @@ public final class PrimaryKeyGenerator {
                 : primaryKey.name();
         String ddl = "ALTER TABLE " + sql.tableName(table, dialect)
                 + "\nADD CONSTRAINT " + sql.identifier(name, dialect)
-                + "\nPRIMARY KEY (" + sql.columns(primaryKey.columns(), dialect) + ")";
+                + "\nPRIMARY KEY (" + sql.columns(primaryKey.columns(), dialect) + ")"
+                + sql.oracleUsingIndex(table, name, primaryKey.columns(), dialect);
         return DdlStatement.of(
                 DdlStatementType.CREATE_PRIMARY_KEY,
                 sql.reference(table, "PRIMARY_KEY"),

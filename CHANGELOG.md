@@ -265,3 +265,11 @@
 - Added document hyperlinks from summary to table details and differences.
 - Retained filters, freeze panes, automatic column sizing, and atomic difference rows.
 - Expanded Excel writer tests for codes, recommendations, hyperlinks, and filters.
+
+## 2026-07-23 - Discovery SQL filtering
+
+- Confirmed all existing discovery rules are injected and executed through `DiscoveryEngine`.
+- Suppressed `INFO`-level `FieldUsageRule` results from generated SQL.
+- Preserved the required behavior: no message for first usage and no message when values match.
+- Made discovery fail-open so metadata/discovery failures do not prevent CREATE TABLE SQL generation.
+- Added `docs/discovery-pipeline-audit.md`.

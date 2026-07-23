@@ -1,6 +1,7 @@
 package com.behsazan.schemaforge.generation.ddl.generator.table;
 
 import com.behsazan.schemaforge.dialect.DatabaseDialect;
+import com.behsazan.schemaforge.dialect.DatabaseProduct;
 import com.behsazan.schemaforge.domain.model.Table;
 import com.behsazan.schemaforge.generation.ddl.model.DdlObjectReference;
 import com.behsazan.schemaforge.generation.ddl.model.DdlPhase;
@@ -32,9 +33,17 @@ public final class TableDdlGenerator {
         String columns = table.columns().stream()
                 .map(column -> "    " + columnGenerator.generate(column, dialect))
                 .collect(Collectors.joining(",\n"));
+        String physicalOptions = physicalOptionsRenderer.render(table.physicalOptions(), dialect);
+        if (dialect.product() == DatabaseProduct.ORACLE
+                && table.physicalOptions().keySet().stream().noneMatch(key -> key.equalsIgnoreCase("TABLESPACE"))) {
+            String schema = table.qualifiedName().schemaName().map(value -> value.value()).orElse("");
+            if (!schema.isBlank()) {
+                physicalOptions += "\nTABLESPACE TS_" + schema;
+            }
+        }
         String sql = "CREATE TABLE " + identifierRenderer.render(table.qualifiedName(), dialect)
                 + " (\n" + columns + "\n)"
-                + physicalOptionsRenderer.render(table.physicalOptions(), dialect);
+                + physicalOptions;
         DdlObjectReference reference = new DdlObjectReference(
                 table.qualifiedName().schemaName().map(Object::toString).orElse(""),
                 table.qualifiedName().name().toString(),

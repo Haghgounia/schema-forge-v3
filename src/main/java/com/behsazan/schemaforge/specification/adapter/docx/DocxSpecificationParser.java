@@ -18,6 +18,7 @@ import com.behsazan.schemaforge.domain.valueobject.DefaultValue;
 import com.behsazan.schemaforge.domain.valueobject.Description;
 import com.behsazan.schemaforge.domain.valueobject.Identifier;
 import com.behsazan.schemaforge.domain.valueobject.QualifiedName;
+import com.behsazan.schemaforge.specification.normalization.check.CheckConstraintNormalizer;
 import com.behsazan.schemaforge.specification.normalization.range.NumericRangeParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
@@ -45,6 +46,8 @@ import java.util.regex.Pattern;
 public final class DocxSpecificationParser implements SpecificationParser {
     private final OracleIdentifierValidator identifierValidator = new OracleIdentifierValidator();
     private final NumericRangeParser numericRangeParser = new NumericRangeParser();
+    private final CheckConstraintNormalizer checkConstraintNormalizer = new CheckConstraintNormalizer();
+
     private static final Pattern DATA_TYPE = Pattern.compile(
             "(?i)^([A-Z][A-Z0-9_ ]*?)(?:\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?(?:\\s+(?:CHAR|BYTE))?\\s*\\))?$");
     private static final Pattern GROUP_REFERENCE = Pattern.compile("(?i)^([A-Z][A-Z0-9_$.]*)(?:/([YN]))?$" );
@@ -105,7 +108,8 @@ public final class DocxSpecificationParser implements SpecificationParser {
                     new DefaultValue(defaultExpression),
                     new Description(parsed.description()),
                     parsed.identity(),
-                    index + 1));
+                    index + 1,
+                    parsed.generatedExpression()));
         }
 
         List<String> primaryKeyColumns = parsedColumns.stream()
@@ -179,16 +183,38 @@ public final class DocxSpecificationParser implements SpecificationParser {
                 expression));
     }
 
-    private String qualifyCheckExpression(String columnName, String expression) {
-        String normalized = normalizeText(expression);
+    private String qualifyCheckExpression(
+            String columnName,
+            String expression) {
+
+
+        String normalized =
+                normalizeText(expression);
+
+
         if (normalized.matches("^(>=|<=|<>|!=|=|>|<).*")) {
+
             return columnName + " " + normalized;
         }
+
+
         if (normalized.matches("^\\d+\\s*\\.\\.\\s*\\d+$")) {
-            String[] bounds = normalized.split("\\.\\.");
-            return columnName + " BETWEEN " + bounds[0].trim() + " AND " + bounds[1].trim();
+
+            String[] bounds =
+                    normalized.split("\\.\\.");
+
+            return columnName
+                    + " BETWEEN "
+                    + bounds[0].trim()
+                    + " AND "
+                    + bounds[1].trim();
         }
-        return normalized;
+
+
+        return checkConstraintNormalizer.normalize(
+                columnName,
+                normalized
+        );
     }
 
     private Map<String, List<PositionedColumn>> groupColumns(
@@ -292,7 +318,8 @@ public final class DocxSpecificationParser implements SpecificationParser {
                     cell(row, headers.get(Header.UNIQUE)),
                     cell(row, headers.get(Header.INDEX)),
                     cell(row, headers.get(Header.RANGE)),
-                    cell(row, headers.get(Header.CHECK_CONSTRAINT))));
+                    cell(row, headers.get(Header.CHECK_CONSTRAINT)),
+                    cell(row, headers.get(Header.GENERATED_EXPRESSION))));
         }
         return result;
     }
@@ -481,6 +508,7 @@ public final class DocxSpecificationParser implements SpecificationParser {
         DEFAULT_VALUE,
         RANGE,
         CHECK_CONSTRAINT,
+        GENERATED_EXPRESSION,
         UNKNOWN;
 
         private static Header from(String rawValue) {
@@ -504,6 +532,11 @@ public final class DocxSpecificationParser implements SpecificationParser {
             if (value.equals("RANGE") || value.contains("دامنه") || value.contains("محدوده")) return RANGE;
             if (value.contains("CHECK") || value.contains("CHECK CONSTRAINT")
                     || value.contains("محدودیت کنترلی")) return CHECK_CONSTRAINT;
+            if (value.contains("VIRTUAL COLUMN") || value.contains("VIRTUAL EXPRESSION")
+                    || value.contains("GENERATED EXPRESSION") || value.contains("COLUMN EXPRESSION")
+                    || value.contains("عبارت ستون مجازی") || value.contains("ستون مجازی")) {
+                return GENERATED_EXPRESSION;
+            }
             return UNKNOWN;
         }
     }
@@ -523,7 +556,8 @@ public final class DocxSpecificationParser implements SpecificationParser {
             String uniqueToken,
             String indexToken,
             String range,
-            String checkConstraint) {
+            String checkConstraint,
+            String generatedExpression) {
     }
 
     private record PositionedColumn(String name, int position) {

@@ -1,6 +1,9 @@
 package com.behsazan.schemaforge.application;
 
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
+import com.behsazan.schemaforge.discovery.core.DiscoveryEngine;
+import com.behsazan.schemaforge.discovery.domain.DiscoveryIssue;
+import com.behsazan.schemaforge.discovery.domain.DiscoveryResult;
 import com.behsazan.schemaforge.application.database.DatabaseMetadataReader;
 import com.behsazan.schemaforge.application.database.DatabaseMetadataReaderRegistry;
 import com.behsazan.schemaforge.application.database.GenerationDatabaseProductResolver;
@@ -16,6 +19,9 @@ import com.behsazan.schemaforge.packaging.ZipArtifactPackager;
 import com.behsazan.schemaforge.reporting.CanonicalSchemaCompareExcelWriter;
 import com.behsazan.schemaforge.specification.adapter.docx.DocxSpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
+import com.behsazan.schemaforge.specification.domain.ColumnDefinition;
+import com.behsazan.schemaforge.specification.domain.DataTypeDefinition;
+import com.behsazan.schemaforge.specification.domain.TableDefinition;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -30,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +54,7 @@ public final class ArtifactGenerationService {
     private final DdlGenerationEngine ddlGenerationEngine;
     private final ZipArtifactPackager packager;
     private final Clock clock;
+    private final DiscoveryEngine discoveryEngine;
 
     @Autowired
     public ArtifactGenerationService(
@@ -54,9 +62,11 @@ public final class ArtifactGenerationService {
             CanonicalSchemaCompareExcelWriter compareExcelWriter,
             DdlGenerationEngine ddlGenerationEngine,
             DatabaseMetadataReaderRegistry metadataReaders,
-            GenerationDatabaseProductResolver databaseProductResolver) {
+            GenerationDatabaseProductResolver databaseProductResolver,
+            Optional<DiscoveryEngine> discoveryEngine) {
         this(parser, compareExcelWriter, ddlGenerationEngine, metadataReaders,
-                databaseProductResolver, new ZipArtifactPackager(), Clock.systemDefaultZone());
+                databaseProductResolver, new ZipArtifactPackager(), Clock.systemDefaultZone(),
+                discoveryEngine.orElse(null));
     }
 
     ArtifactGenerationService(
@@ -65,7 +75,7 @@ public final class ArtifactGenerationService {
             ZipArtifactPackager packager,
             Clock clock) {
         this(parser, new CanonicalSchemaCompareExcelWriter(), ddlGenerationEngine,
-                new DatabaseMetadataReaderRegistry(List.of()), null, packager, clock);
+                new DatabaseMetadataReaderRegistry(List.of()), null, packager, clock, null);
     }
 
     ArtifactGenerationService(
@@ -76,6 +86,19 @@ public final class ArtifactGenerationService {
             GenerationDatabaseProductResolver databaseProductResolver,
             ZipArtifactPackager packager,
             Clock clock) {
+        this(parser, compareExcelWriter, ddlGenerationEngine, metadataReaders,
+                databaseProductResolver, packager, clock, null);
+    }
+
+    ArtifactGenerationService(
+            DocxSpecificationParser parser,
+            CanonicalSchemaCompareExcelWriter compareExcelWriter,
+            DdlGenerationEngine ddlGenerationEngine,
+            DatabaseMetadataReaderRegistry metadataReaders,
+            GenerationDatabaseProductResolver databaseProductResolver,
+            ZipArtifactPackager packager,
+            Clock clock,
+            DiscoveryEngine discoveryEngine) {
         this.parser = parser;
         this.compareExcelWriter = compareExcelWriter;
         this.ddlGenerationEngine = ddlGenerationEngine;
@@ -84,6 +107,7 @@ public final class ArtifactGenerationService {
         this.databaseProductResolver = databaseProductResolver;
         this.packager = packager;
         this.clock = clock;
+        this.discoveryEngine = discoveryEngine;
     }
 
     public GeneratedZip generateFromWord(String fileName, InputStream content) {
@@ -135,34 +159,197 @@ public final class ArtifactGenerationService {
         return new GeneratedZip(baseName + ".zip", result);
     }
 
-    private List<GeneratedArtifact> artifacts(DatabaseSchema schema, String baseName) {
-        Table documentTable = schema.tables().getFirst();
-        DatabaseProduct targetProduct = resolveTargetProduct();
-        DatabaseMetadataReader reader = metadataReaders.find(targetProduct).orElse(null);
+    private List<GeneratedArtifact> artifacts(
+            DatabaseSchema schema,
+            String baseName) {
+
+
+        List<GeneratedArtifact> artifacts =
+                new ArrayList<>();
+
+
+        Table documentTable =
+                schema.tables().getFirst();
+
+
+        DatabaseProduct targetProduct =
+                resolveTargetProduct();
+
+
+
+        /*
+         * 1- Always generate DDL
+         */
+        var ddlResult =
+                ddlGenerationEngine.generate(
+                        DdlGenerationRequest.of(
+                                schema,
+                                targetProduct,
+                                ScriptOptions.defaults(),
+                                clock
+                        )
+                );
+
+
+        if (ddlResult.renderedDdl().isEmpty()) {
+            throw new IllegalStateException(
+                    targetProduct
+                            + " SQL generation produced an empty script for "
+                            + baseName
+            );
+        }
+
+
+        String ddl = prependDiscoveryIssues(ddlResult.ddl(), documentTable);
+
+        byte[] sql =
+                ddl.getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8
+                );
+
+
+        artifacts.add(
+                new GeneratedArtifact(
+                        baseName + ".sql",
+                        ArtifactType.SQL,
+                        sql,
+                        100,
+                        "application/sql; charset=UTF-8"
+                )
+        );
+
+
+
+        /*
+         * 2- Generate comparison Excel only when table exists
+         */
+        DatabaseMetadataReader reader =
+                metadataReaders.find(targetProduct)
+                        .orElse(null);
+
 
         if (reader != null) {
-            var databaseTable = reader.readTable(
-                    documentTable.qualifiedName().schema().value(),
-                    documentTable.qualifiedName().name().value());
+
+
+            var databaseTable =
+                    reader.readTable(
+                            documentTable.qualifiedName()
+                                    .schema()
+                                    .value(),
+
+                            documentTable.qualifiedName()
+                                    .name()
+                                    .value()
+                    );
+
+
             if (databaseTable.isPresent()) {
-                byte[] excel = compareExcelWriter.write(
-                        documentTable, databaseTable.get(), reader.columnUsageCounts());
-                String compareName = safeName(documentTable.qualifiedName().name().value())
-                        + "_compare_" + timestampForComparison() + ".xlsx";
-                return List.of(new GeneratedArtifact(
-                        compareName, ArtifactType.EXCEL, excel, 100,
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+
+
+                byte[] excel =
+                        compareExcelWriter.write(
+                                documentTable,
+                                databaseTable.get(),
+                                reader.columnUsageCounts()
+                        );
+
+
+                String excelName =
+                        safeName(
+                                documentTable.qualifiedName()
+                                        .name()
+                                        .value()
+                        )
+                                + "-"
+                                + timestamp()
+                                + ".xlsx";
+
+
+                artifacts.add(
+                        new GeneratedArtifact(
+                                excelName,
+                                ArtifactType.EXCEL,
+                                excel,
+                                100,
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                );
             }
         }
 
-        var ddlResult = ddlGenerationEngine.generate(DdlGenerationRequest.of(
-                schema, targetProduct, ScriptOptions.defaults(), clock));
-        if (ddlResult.renderedDdl().isEmpty()) {
-            throw new IllegalStateException(targetProduct + " SQL generation produced an empty script for " + baseName);
+
+        return List.copyOf(artifacts);
+    }
+
+
+    private String prependDiscoveryIssues(String ddl, Table documentTable) {
+        if (discoveryEngine == null) {
+            return ddl;
         }
-        byte[] sql = ddlResult.ddl().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        return List.of(new GeneratedArtifact(
-                baseName + ".sql", ArtifactType.SQL, sql, 100, "application/sql; charset=UTF-8"));
+
+        DiscoveryResult result;
+        try {
+            result = discoveryEngine.discover(toTableDefinition(documentTable));
+        } catch (RuntimeException exception) {
+            return ddl;
+        }
+
+        List<DiscoveryIssue> actionableIssues = result.issues().stream()
+                .filter(issue -> issue.severity() != com.behsazan.schemaforge.discovery.domain.DiscoverySeverity.INFO)
+                .toList();
+        if (actionableIssues.isEmpty()) {
+            return ddl;
+        }
+
+        String lineSeparator = System.lineSeparator();
+        StringBuilder hints = new StringBuilder();
+        hints.append("-- =====================================================").append(lineSeparator);
+        hints.append("-- SCHEMAFORGE DISCOVERY WARNINGS").append(lineSeparator);
+        hints.append("-- =====================================================").append(lineSeparator);
+
+        for (DiscoveryIssue issue : actionableIssues) {
+            hints.append("-- ").append(issue.severity()).append(": ").append(issue.code()).append(lineSeparator);
+            if (issue.columnName() != null && !issue.columnName().isBlank()) {
+                hints.append("-- Column: ").append(issue.columnName()).append(lineSeparator);
+            }
+            hints.append("-- ").append(issue.message()).append(lineSeparator);
+            String locations = issue.details().get("locations");
+            if (locations != null && !locations.isBlank()) {
+                hints.append("-- Existing usages: ").append(locations).append(lineSeparator);
+            }
+            hints.append("-- Action: Review the difference before executing this script.")
+                    .append(lineSeparator).append(lineSeparator);
+        }
+        return hints.append(ddl).toString();
+    }
+
+    private TableDefinition toTableDefinition(Table table) {
+        List<ColumnDefinition> columns = table.columns().stream()
+                .map(column -> new ColumnDefinition(
+                        column.name().value(),
+                        new DataTypeDefinition(
+                                column.dataType().name().value(),
+                                column.dataType().length(),
+                                column.dataType().precision(),
+                                column.dataType().scale()),
+                        column.nullable(),
+                        column.defaultValue().isPresent() ? column.defaultValue().expression() : null,
+                        column.description().value(),
+                        table.primaryKey().map(pk -> pk.columns().contains(column.name())).orElse(false),
+                        false,
+                        false))
+                .toList();
+
+        return new TableDefinition(
+                table.qualifiedName().schema().value(),
+                table.qualifiedName().name().value(),
+                table.description().value(),
+                columns,
+                null,
+                List.of(),
+                List.of(),
+                null,
+                java.util.Map.of());
     }
 
     private DatabaseProduct resolveTargetProduct() {

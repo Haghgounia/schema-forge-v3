@@ -31,7 +31,8 @@ public final class UniqueKeyGenerator {
                     : uniqueKey.name();
             String ddl = "ALTER TABLE " + sql.tableName(table, dialect)
                     + "\nADD CONSTRAINT " + sql.identifier(name, dialect)
-                    + "\nUNIQUE (" + sql.columns(uniqueKey.columns(), dialect) + ")";
+                    + "\nUNIQUE (" + sql.columns(uniqueKey.columns(), dialect) + ")"
+                    + sql.oracleUsingIndex(table, name, uniqueKey.columns(), dialect);
             statements.add(DdlStatement.of(
                     DdlStatementType.CREATE_UNIQUE_KEY,
                     sql.reference(table, "UNIQUE_KEY"),

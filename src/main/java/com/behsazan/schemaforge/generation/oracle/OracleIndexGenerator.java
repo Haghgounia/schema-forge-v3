@@ -1,11 +1,13 @@
 package com.behsazan.schemaforge.generation.oracle;
 
+import com.behsazan.schemaforge.dialect.oracle.OracleDialect;
 import com.behsazan.schemaforge.domain.enums.IndexType;
 import com.behsazan.schemaforge.domain.enums.SortDirection;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
 import com.behsazan.schemaforge.domain.model.Index;
 import com.behsazan.schemaforge.domain.model.IndexColumn;
 import com.behsazan.schemaforge.domain.model.Table;
+import com.behsazan.schemaforge.generation.ddl.generator.index.IndexGenerator;
 import com.behsazan.schemaforge.generation.model.SqlSection;
 import com.behsazan.schemaforge.generation.model.SqlStatement;
 import java.util.ArrayList;
@@ -49,7 +51,8 @@ public final class OracleIndexGenerator {
                 .append(table.qualifiedName())
                 .append(" (")
                 .append(columns(index))
-                .append(')');
+                .append(')')
+                .append(IndexGenerator.oracleIndexTablespace(table, new OracleDialect()));
 
         return sql.append(';').toString();
     }

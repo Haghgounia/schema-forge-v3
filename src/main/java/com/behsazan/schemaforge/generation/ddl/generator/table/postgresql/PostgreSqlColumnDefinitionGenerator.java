@@ -17,6 +17,10 @@ public final class PostgreSqlColumnDefinitionGenerator implements ColumnDefiniti
     private final DataTypeSqlRenderer dataTypes = new DataTypeSqlRenderer();
     @Override public String generate(Column column, DatabaseDialect dialect) {
         Objects.requireNonNull(column); Objects.requireNonNull(dialect);
+        if (column.generated()) {
+            throw new TableGenerationException(
+                    "Generated columns are not yet implemented for " + dialect.name());
+        }
         StringBuilder sql = new StringBuilder(identifiers.render(column.name(), dialect))
                 .append(' ').append(dataTypes.render(column.dataType(), dialect));
         if (column.identity()) {

@@ -81,7 +81,7 @@ class ArtifactGenerationServiceTest {
 
 
     @Test
-    void existingDatabaseTableProducesOnlyComparisonExcel() throws Exception {
+    void existingDatabaseTableProducesSqlAndComparisonExcel() throws Exception {
         DatabaseSchemaHolder holder = databaseTable("CUSTOMER");
         DatabaseMetadataReader lookup = new DatabaseMetadataReader() {
             @Override public DatabaseProduct databaseProduct() { return DatabaseProduct.ORACLE; }
@@ -102,7 +102,11 @@ class ArtifactGenerationServiceTest {
                 "customer.docx", new ByteArrayInputStream(docx("CUSTOMER")));
 
         Map<String, byte[]> entries = unzip(result.content());
-        assertThat(entries).containsOnlyKeys("CUSTOMER_compare_20260720_103025.xlsx");
+        assertThat(entries)
+                .containsKeys(
+                        "CUSTOMER-20260720-103025.sql",
+                        "CUSTOMER-20260720-103025.xlsx"
+                );
         assertThat(entries.values().iterator().next()).isNotEmpty();
     }
 

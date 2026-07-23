@@ -1,6 +1,7 @@
 package com.behsazan.schemaforge.generation.ddl.generator.index;
 
 import com.behsazan.schemaforge.dialect.DatabaseDialect;
+import com.behsazan.schemaforge.dialect.DatabaseProduct;
 import com.behsazan.schemaforge.domain.enums.IndexType;
 import com.behsazan.schemaforge.domain.enums.SortDirection;
 import com.behsazan.schemaforge.domain.model.Index;
@@ -47,7 +48,8 @@ public final class IndexGenerator {
         String ddl = "CREATE " + typePrefix(index.type(), dialect)
                 + "INDEX " + qualifiedIndexName(table, name, dialect)
                 + "\nON " + identifiers.render(table.qualifiedName(), dialect)
-                + " (" + columns(index.columns(), dialect) + ")";
+                + " (" + columns(index.columns(), dialect) + ")"
+                + oracleIndexTablespace(table, dialect);
 
         return DdlStatement.of(
                 DdlStatementType.CREATE_INDEX,
@@ -57,6 +59,14 @@ public final class IndexGenerator {
                         "INDEX"),
                 new StatementOrder(DdlPhase.INDEXES, position),
                 SqlFragment.of(ddl));
+    }
+
+    public static String oracleIndexTablespace(Table table, DatabaseDialect dialect) {
+        if (dialect.product() != DatabaseProduct.ORACLE) {
+            return "";
+        }
+        String schema = table.qualifiedName().schemaName().map(value -> value.value()).orElse("");
+        return "\nTABLESPACE " + (schema.isBlank() ? "ITS" : "ITS_" + schema);
     }
 
     private String qualifiedIndexName(Table table, Identifier name, DatabaseDialect dialect) {

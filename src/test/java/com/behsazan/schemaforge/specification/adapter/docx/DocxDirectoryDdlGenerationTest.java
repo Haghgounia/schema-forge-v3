@@ -160,13 +160,13 @@ class DocxDirectoryDdlGenerationTest {
                         rootMessage(exception)));
 
                 if (!properties.options().continueOnError()) {
-                    writeReports(outputDirectory, results);
+                    writeReports(outputDirectory, results, outputTimestamp);
                     throw exception;
                 }
             }
         }
 
-        writeReports(outputDirectory, results);
+        writeReports(outputDirectory, results, outputTimestamp);
 
         long succeeded = results.stream()
                 .filter(FileResult::succeeded)
@@ -188,7 +188,7 @@ class DocxDirectoryDdlGenerationTest {
                     .as(
                             "DDL generation failures. See %s",
                             outputDirectory
-                                    .resolve("generation-results.csv")
+                                    .resolve("generation-results-" + outputTimestamp + ".csv")
                                     .toAbsolutePath())
                     .isZero();
         }
@@ -418,19 +418,24 @@ class DocxDirectoryDdlGenerationTest {
 
     private void writeReports(
             Path outputDirectory,
-            List<FileResult> results) throws Exception {
+            List<FileResult> results,
+            String outputTimestamp) throws Exception {
 
         if (properties.report().csv()) {
             writeCsvReport(
                     outputDirectory.resolve(
-                            "generation-results.csv"),
+                            "generation-results-"
+                                    + outputTimestamp
+                                    + ".csv"),
                     results);
         }
 
         if (properties.report().summary()) {
             writeSummaryReport(
                     outputDirectory.resolve(
-                            "generation-summary.txt"),
+                            "generation-summary-"
+                                    + outputTimestamp
+                                    + ".txt"),
                     results);
         }
     }
