@@ -3,8 +3,10 @@ package com.behsazan.schemaforge.specification.adapter.ea;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
 import com.behsazan.schemaforge.specification.spi.SpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
+import org.springframework.stereotype.Component;
 
 /** Migration target for the v2 Enterprise Architect XMI parser. */
+@Component
 public final class EaXmiSpecificationParser implements SpecificationParser {
     @Override
     public boolean supports(String fileName) {

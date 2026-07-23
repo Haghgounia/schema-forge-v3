@@ -1,19 +1,18 @@
 package com.behsazan.schemaforge.specification.adapter.docx;
 
-import com.behsazan.schemaforge.database.service.DatabaseDictionaryCache;
+import com.behsazan.schemaforge.dialect.oracle.OracleDialect;
 import com.behsazan.schemaforge.dialect.postgresql.PostgreSqlDialect;
 import com.behsazan.schemaforge.domain.model.DatabaseSchema;
+import com.behsazan.schemaforge.generation.ddl.generator.schema.SchemaScriptGenerator;
 import com.behsazan.schemaforge.generation.ddl.generator.script.TableScriptGenerator;
 import com.behsazan.schemaforge.generation.enrichment.AuditColumnSchemaEnricher;
 import com.behsazan.schemaforge.generation.ddl.generator.table.TableDdlGenerator;
+import com.behsazan.schemaforge.generation.ddl.generator.table.oracle.OracleColumnDefinitionGenerator;
 import com.behsazan.schemaforge.generation.ddl.generator.table.postgresql.PostgreSqlColumnDefinitionGenerator;
 import com.behsazan.schemaforge.generation.ddl.model.RenderContext;
 import com.behsazan.schemaforge.generation.ddl.model.ScriptOptions;
+import com.behsazan.schemaforge.generation.ddl.renderer.oracle.OracleDdlRenderer;
 import com.behsazan.schemaforge.generation.ddl.renderer.postgresql.PostgreSqlDdlRenderer;
-import com.behsazan.schemaforge.generation.oracle.OracleDdlGenerator;
-import com.behsazan.schemaforge.generation.spi.DatabaseType;
-import com.behsazan.schemaforge.generation.spi.GenerationContext;
-import com.behsazan.schemaforge.generation.spi.GenerationOptions;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
 import java.io.BufferedWriter;
 import java.io.InputStream;
@@ -31,7 +30,6 @@ import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -58,14 +56,9 @@ class DocxDirectoryDdlGenerationTest {
     private static final DateTimeFormatter OUTPUT_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final DdlGenerationProperties properties;
-    private final DatabaseDictionaryCache databaseDictionaryCache;
-
     @Autowired
-    DocxDirectoryDdlGenerationTest(
-            DdlGenerationProperties properties,
-            ObjectProvider<DatabaseDictionaryCache> databaseDictionaryCacheProvider) {
+    DocxDirectoryDdlGenerationTest(DdlGenerationProperties properties) {
         this.properties = properties;
-        this.databaseDictionaryCache = databaseDictionaryCacheProvider.getIfAvailable();
     }
 
     @Test
@@ -100,9 +93,9 @@ class DocxDirectoryDdlGenerationTest {
         DocxSpecificationParser parser = new DocxSpecificationParser();
         AuditColumnSchemaEnricher auditColumnEnricher = new AuditColumnSchemaEnricher();
 
-        OracleDdlGenerator oracleGenerator =
+        OracleComponents oracle =
                 properties.dialects().oracle()
-                        ? new OracleDdlGenerator(databaseDictionaryCache)
+                        ? createOracleComponents()
                         : null;
 
         PostgreSqlComponents postgreSql =
@@ -128,8 +121,9 @@ class DocxDirectoryDdlGenerationTest {
                 if (properties.dialects().oracle()) {
                     String oracleSql = generateOracle(
                             schema,
-                            relativeDocx,
-                            oracleGenerator);
+                            oracle.generator(),
+                            oracle.renderer(),
+                            oracle.renderContext());
 
                     writeSql(
                             oracleDirectory.resolve(relativeSql),
@@ -275,6 +269,35 @@ class DocxDirectoryDdlGenerationTest {
         }
     }
 
+    private OracleComponents createOracleComponents() {
+        OracleDialect dialect = new OracleDialect();
+
+        SchemaScriptGenerator generator =
+                new SchemaScriptGenerator(
+                        new TableScriptGenerator(
+                                new TableDdlGenerator(
+                                        new OracleColumnDefinitionGenerator())));
+
+        OracleDdlRenderer renderer = new OracleDdlRenderer();
+
+        RenderContext renderContext =
+                new RenderContext(
+                        dialect,
+                        new ScriptOptions(
+                                true,
+                                false,
+                                true,
+                                true,
+                                System.lineSeparator()),
+                        Clock.systemUTC(),
+                        Map.of());
+
+        return new OracleComponents(
+                generator,
+                renderer,
+                renderContext);
+    }
+
     private PostgreSqlComponents createPostgreSqlComponents() {
         PostgreSqlDialect dialect = new PostgreSqlDialect();
 
@@ -307,39 +330,19 @@ class DocxDirectoryDdlGenerationTest {
 
     private String generateOracle(
             DatabaseSchema schema,
-            Path source,
-            OracleDdlGenerator generator) {
+            SchemaScriptGenerator generator,
+            OracleDdlRenderer renderer,
+            RenderContext renderContext) {
 
-        var result = generator.generate(
-                new GenerationContext(
-                        schema,
-                        DatabaseType.ORACLE,
-                        GenerationOptions.defaults(),
-                        Clock.systemUTC()));
-
-        if (result.hasErrors() || result.artifacts().isEmpty()) {
-            String messages = result.messages().stream()
-                    .map(message ->
-                            message.code()
-                                    + ": "
-                                    + message.message())
-                    .reduce((left, right) ->
-                            left + " | " + right)
-                    .orElse(
-                            "Oracle generator returned no artifact");
-
+        if (schema.tables().isEmpty()) {
             throw new IllegalStateException(
-                    "Oracle generation failed for "
-                            + source
-                            + ": "
-                            + messages);
+                    "Parsed specification contains no tables");
         }
 
-        return new String(
-                result.artifacts()
-                        .getFirst()
-                        .content(),
-                StandardCharsets.UTF_8);
+        return renderer.render(
+                        generator.generate(schema, renderContext.dialect()),
+                        renderContext)
+                .content();
     }
 
     private String generatePostgreSql(
@@ -665,6 +668,12 @@ class DocxDirectoryDdlGenerationTest {
     public record Report(
             boolean csv,
             boolean summary) {
+    }
+
+    private record OracleComponents(
+            SchemaScriptGenerator generator,
+            OracleDdlRenderer renderer,
+            RenderContext renderContext) {
     }
 
     private record PostgreSqlComponents(

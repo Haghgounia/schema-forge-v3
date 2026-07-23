@@ -18,6 +18,7 @@ import com.behsazan.schemaforge.generation.spi.GeneratedArtifact;
 import com.behsazan.schemaforge.packaging.ZipArtifactPackager;
 import com.behsazan.schemaforge.reporting.CanonicalSchemaCompareExcelWriter;
 import com.behsazan.schemaforge.specification.adapter.docx.DocxSpecificationParser;
+import com.behsazan.schemaforge.specification.adapter.ea.EaXmiSpecificationParser;
 import com.behsazan.schemaforge.specification.spi.SpecificationSource;
 import com.behsazan.schemaforge.specification.domain.ColumnDefinition;
 import com.behsazan.schemaforge.specification.domain.DataTypeDefinition;
@@ -48,6 +49,7 @@ public final class ArtifactGenerationService {
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final DocxSpecificationParser parser;
+    private final EaXmiSpecificationParser eaXmiParser;
     private final CanonicalSchemaCompareExcelWriter compareExcelWriter;
     private final DatabaseMetadataReaderRegistry metadataReaders;
     private final GenerationDatabaseProductResolver databaseProductResolver;
@@ -63,10 +65,11 @@ public final class ArtifactGenerationService {
             DdlGenerationEngine ddlGenerationEngine,
             DatabaseMetadataReaderRegistry metadataReaders,
             GenerationDatabaseProductResolver databaseProductResolver,
-            Optional<DiscoveryEngine> discoveryEngine) {
+            Optional<DiscoveryEngine> discoveryEngine,
+            Optional<EaXmiSpecificationParser> eaXmiParser) {
         this(parser, compareExcelWriter, ddlGenerationEngine, metadataReaders,
                 databaseProductResolver, new ZipArtifactPackager(), Clock.systemDefaultZone(),
-                discoveryEngine.orElse(null));
+                discoveryEngine.orElse(null), eaXmiParser.orElse(null));
     }
 
     ArtifactGenerationService(
@@ -75,7 +78,7 @@ public final class ArtifactGenerationService {
             ZipArtifactPackager packager,
             Clock clock) {
         this(parser, new CanonicalSchemaCompareExcelWriter(), ddlGenerationEngine,
-                new DatabaseMetadataReaderRegistry(List.of()), null, packager, clock, null);
+                new DatabaseMetadataReaderRegistry(List.of()), null, packager, clock, null, null);
     }
 
     ArtifactGenerationService(
@@ -87,7 +90,7 @@ public final class ArtifactGenerationService {
             ZipArtifactPackager packager,
             Clock clock) {
         this(parser, compareExcelWriter, ddlGenerationEngine, metadataReaders,
-                databaseProductResolver, packager, clock, null);
+                databaseProductResolver, packager, clock, null, null);
     }
 
     ArtifactGenerationService(
@@ -98,8 +101,10 @@ public final class ArtifactGenerationService {
             GenerationDatabaseProductResolver databaseProductResolver,
             ZipArtifactPackager packager,
             Clock clock,
-            DiscoveryEngine discoveryEngine) {
+            DiscoveryEngine discoveryEngine,
+            EaXmiSpecificationParser eaXmiParser) {
         this.parser = parser;
+        this.eaXmiParser = eaXmiParser;
         this.compareExcelWriter = compareExcelWriter;
         this.ddlGenerationEngine = ddlGenerationEngine;
         this.metadataReaders = metadataReaders == null
@@ -120,6 +125,36 @@ public final class ArtifactGenerationService {
         return new GeneratedZip(baseName + ".zip", zip);
     }
 
+    public GeneratedZip generateFromEnterpriseArchitectXml(String fileName, InputStream content) {
+        if (eaXmiParser == null) {
+            throw new IllegalStateException("Enterprise Architect XMI parser is not available");
+        }
+        String timestamp = timestamp();
+        DatabaseSchema schema = eaXmiParser.parse(new SpecificationSource(fileName, content));
+        if (schema.tables().isEmpty()) {
+            throw new IllegalArgumentException("EA XML does not contain any table: " + fileName);
+        }
+
+        List<GeneratedArtifact> generated = new ArrayList<>();
+        Set<String> names = new HashSet<>();
+        for (Table table : schema.tables()) {
+            DatabaseSchema singleTableSchema = singleTableSchema(schema, table);
+            String baseName = safeName(table.qualifiedName().name().value()) + "-" + timestamp;
+            for (GeneratedArtifact artifact : artifacts(singleTableSchema, baseName)) {
+                if (!names.add(artifact.fileName())) {
+                    throw new IllegalArgumentException("Duplicate table output name in EA XML: " + artifact.fileName());
+                }
+                generated.add(artifact);
+            }
+        }
+
+        String bundleName = schema.tables().size() == 1
+                ? safeName(schema.tables().getFirst().qualifiedName().name().value()) + "-" + timestamp
+                : "SchemaForge-EA-" + timestamp;
+        byte[] zip = packager.packageArtifacts(new ArtifactBundle(bundleName, generated));
+        return new GeneratedZip(bundleName + ".zip", zip);
+    }
+
     public GeneratedZip generateFromZip(String fileName, InputStream content) {
         String timestamp = timestamp();
         List<GeneratedArtifact> artifacts = new ArrayList<>();
@@ -129,12 +164,22 @@ public final class ArtifactGenerationService {
         try (ZipInputStream zip = new ZipInputStream(content)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
-                if (entry.isDirectory() || !entry.getName().toLowerCase(Locale.ROOT).endsWith(".docx")) {
+                String entryName = entry.getName();
+                String lowerName = entryName.toLowerCase(Locale.ROOT);
+                if (entry.isDirectory() || (!lowerName.endsWith(".docx") && !lowerName.endsWith(".xml"))) {
                     zip.closeEntry();
                     continue;
                 }
-                byte[] docx = readAll(zip);
-                DatabaseSchema schema = parser.parse(new SpecificationSource(entry.getName(), new ByteArrayInputStream(docx)));
+                byte[] sourceBytes = readAll(zip);
+                DatabaseSchema schema;
+                if (lowerName.endsWith(".docx")) {
+                    schema = parser.parse(new SpecificationSource(entryName, new ByteArrayInputStream(sourceBytes)));
+                } else {
+                    if (eaXmiParser == null) {
+                        throw new IllegalStateException("Enterprise Architect XMI parser is not available");
+                    }
+                    schema = eaXmiParser.parse(new SpecificationSource(entryName, new ByteArrayInputStream(sourceBytes)));
+                }
                 Table table = requireSingleTable(schema, entry.getName());
                 String baseName = safeName(table.qualifiedName().name().value()) + "-" + timestamp;
                 for (GeneratedArtifact artifact : artifacts(schema, baseName)) {
@@ -151,7 +196,7 @@ public final class ArtifactGenerationService {
         }
 
         if (documentCount == 0) {
-            throw new IllegalArgumentException("Input ZIP does not contain any DOCX file");
+            throw new IllegalArgumentException("Input ZIP does not contain any DOCX or EA XML file");
         }
 
         String baseName = "SchemaForge-" + timestamp;
@@ -354,6 +399,19 @@ public final class ArtifactGenerationService {
 
     private DatabaseProduct resolveTargetProduct() {
         return databaseProductResolver == null ? DatabaseProduct.ORACLE : databaseProductResolver.resolve();
+    }
+
+
+    private DatabaseSchema singleTableSchema(DatabaseSchema source, Table table) {
+        DatabaseSchema.Builder builder = DatabaseSchema.builder(source.name().value())
+                .description(source.description().value())
+                .addTable(table);
+        source.metadata().forEach(builder::metadata);
+        source.sequences().stream()
+                .filter(sequence -> sequence.qualifiedName().schema().equals(table.qualifiedName().schema()))
+                .forEach(builder::addSequence);
+        source.grants().forEach(builder::addGrant);
+        return builder.build();
     }
 
     private Table requireSingleTable(DatabaseSchema schema, String sourceName) {

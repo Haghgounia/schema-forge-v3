@@ -39,6 +39,14 @@ public class SpecificationArtifactController {
         return response(result);
     }
 
+    @PostMapping(value = "/enterprise-architect-xml", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = "application/zip")
+    public ResponseEntity<byte[]> generateEnterpriseArchitectXml(@RequestParam("file") MultipartFile file) throws IOException {
+        requireFile(file, ".xml");
+        GeneratedZip result = service.generateFromEnterpriseArchitectXml(
+                file.getOriginalFilename(), file.getInputStream());
+        return response(result);
+    }
+
     private void requireFile(MultipartFile file, String extension) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Input file must not be empty");
